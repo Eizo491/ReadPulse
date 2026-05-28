@@ -1,0 +1,61 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}ReadPulse{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/main.css' %}">
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<aside class="sidebar">
+  <div class="sidebar-logo">
+    <a href="/" class="logo-mark">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      Read<span>Pulse</span>
+    </a>
+    <div class="logo-sub">Your reading companion</div>
+  </div>
+
+  <nav class="sidebar-nav">
+    <div class="nav-label">Menu</div>
+
+    <a href="/" class="nav-item {% if request.resolver_match.url_name == 'search' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      Search Books
+    </a>
+
+    <a href="/favorites/" class="nav-item {% if request.resolver_match.url_name == 'favorites' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+      </svg>
+      Favorites
+      {% if fav_count %}
+      <span class="fav-badge">{{ fav_count }}</span>
+      {% endif %}
+    </a>
+  </nav>
+
+  <div class="sidebar-footer">
+    Powered by Google Books API
+  </div>
+</aside>
+
+<!-- ── Main ── -->
+<main class="main">
+  {% block content %}{% endblock %}
+</main>
+
+<!-- Toast container -->
+<div class="toast-container" id="toast-container"></div>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

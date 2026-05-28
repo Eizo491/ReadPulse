@@ -1,0 +1,78 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}Favorites – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Your Favorites</div>
+    <div class="topbar-subtitle">
+      <span id="fav-count">{{ favorites|length }}</span> saved book{{ favorites|length|pluralize }}
+    </div>
+  </div>
+</div>
+
+<div class="page-content">
+  <div id="fav-area">
+    {% if favorites %}
+    <div class="fav-grid" id="fav-grid">
+      {% for book in favorites %}
+      <div class="fav-card" data-id="{{ book.google_books_id }}">
+
+        <div class="book-cover">
+          {% if book.thumbnail %}
+          <img src="{{ book.thumbnail }}" alt="{{ book.title }}" loading="lazy"
+               onerror="this.parentElement.innerHTML='<div class=\'book-cover-placeholder\'><svg width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><path d=\'M4 19.5A2.5 2.5 0 0 1 6.5 17H20\'/><path d=\'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\'/></svg><span>No Cover</span></div>'">
+          {% else %}
+          <div class="book-cover-placeholder">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+            </svg>
+            <span>No Cover</span>
+          </div>
+          {% endif %}
+
+          <!-- Remove button -->
+          <button class="remove-btn" data-id="{{ book.google_books_id }}" aria-label="Remove from favorites" title="Remove">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+                fill="#e05252" stroke="#e05252"/>
+            </svg>
+          </button>
+        </div>
+
+        <div class="book-info">
+          <div class="book-title">{{ book.title }}</div>
+          {% if book.authors %}
+          <div class="book-author">{{ book.authors }}</div>
+          {% endif %}
+          <div class="book-meta">
+            {% if book.published_date %}
+            <span class="book-year">{{ book.published_date|slice:":4" }}</span>
+            {% endif %}
+            {% if book.average_rating %}
+            <span class="book-rating">★ {{ book.average_rating }}</span>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+      {% endfor %}
+    </div>
+
+    {% else %}
+    <div class="status-msg">
+      <span class="status-icon">🤍</span>
+      <p>Your favorites list is empty.</p>
+      <p class="status-hint"><a href="/" style="color:var(--accent)">Search for books</a> and tap the heart to save them here.</p>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+{% endblock %}

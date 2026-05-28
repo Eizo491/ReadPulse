@@ -1,0 +1,49 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}Search Books – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Search Books</div>
+    <div class="topbar-subtitle">Discover your next great read</div>
+  </div>
+</div>
+
+<div class="page-content">
+
+  <!-- Search Form -->
+  <div class="search-wrap">
+    <form id="search-form" class="search-box">
+      <input
+        type="text"
+        id="search-input"
+        placeholder="Search by title, author, or ISBN…"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <button type="submit" class="btn-search">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        Search
+      </button>
+    </form>
+  </div>
+
+  <!-- Results -->
+  <div id="results-area">
+    <div class="status-msg">
+      <span class="status-icon">📚</span>
+      <p>Search for a book to get started.</p>
+      <p class="status-hint">Try "Harry Potter", "Atomic Habits", or any author name.</p>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+{% endblock %}

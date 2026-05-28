@@ -1,3 +1,171 @@
-from django.shortcuts import render
+import json
+import urllib.request
+import urllib.parse
+import urllib.error
 
-# Create your views here.
+from django.conf import settings
+from django.shortcuts import render, get_object_or_404
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.http import require_http_methods
+
+from .models import FavoriteBook
+
+
+# ─────────────────────────────────────────────
+# Page views
+# ─────────────────────────────────────────────
+
+def search_page(request):
+    """Render the Search Books page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/search.html', {'fav_count': fav_count})
+
+
+def favorites_page(request):
+    """Render the Favorites page."""
+    favorites = FavoriteBook.objects.all()
+    return render(request, 'books/favorites.html', {
+        'favorites': favorites,
+        'fav_count': favorites.count(),
+    })
+
+
+# ─────────────────────────────────────────────
+# RESTful API  –  /api/...
+# ─────────────────────────────────────────────
+
+@require_http_methods(["GET"])
+def api_search_books(request):
+    """
+    GET /api/search/?q=<query>&max_results=<n>
+    Proxy the Google Books API and return JSON.
+    API key is read from settings.GOOGLE_BOOKS_API_KEY.
+    """
+    query = request.GET.get('q', '').strip()
+    max_results = request.GET.get('max_results', '20')
+    api_key = getattr(settings, 'GOOGLE_BOOKS_API_KEY', '').strip()
+
+    if not query:
+        return JsonResponse({'error': 'Query parameter "q" is required.'}, status=400)
+    if not api_key:
+        return JsonResponse({'error': 'Google Books API key is not configured on the server.'}, status=500)
+
+    try:
+        max_results = min(int(max_results), 40)
+    except ValueError:
+        max_results = 20
+
+    encoded_query = urllib.parse.quote(query)
+    url = (
+        f'https://www.googleapis.com/books/v1/volumes'
+        f'?q={encoded_query}&maxResults={max_results}&key={api_key}'
+    )
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8')
+        try:
+            err_json = json.loads(body)
+            msg = err_json.get('error', {}).get('message', str(e))
+        except Exception:
+            msg = str(e)
+        return JsonResponse({'error': msg}, status=e.code)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    items = data.get('items', [])
+    books = []
+    favorite_ids = set(FavoriteBook.objects.values_list('google_books_id', flat=True))
+
+    for item in items:
+        info = item.get('volumeInfo', {})
+        image_links = info.get('imageLinks', {})
+        thumbnail = (
+            image_links.get('thumbnail', '')
+            or image_links.get('smallThumbnail', '')
+        )
+        # Upgrade to HTTPS
+        if thumbnail.startswith('http://'):
+            thumbnail = thumbnail.replace('http://', 'https://', 1)
+
+        book_id = item.get('id', '')
+        books.append({
+            'google_books_id': book_id,
+            'title': info.get('title', 'Unknown Title'),
+            'authors': ', '.join(info.get('authors', [])),
+            'description': info.get('description', ''),
+            'thumbnail': thumbnail,
+            'published_date': info.get('publishedDate', ''),
+            'page_count': info.get('pageCount'),
+            'categories': ', '.join(info.get('categories', [])),
+            'average_rating': info.get('averageRating'),
+            'is_favorite': book_id in favorite_ids,
+        })
+
+    return JsonResponse({
+        'total_items': data.get('totalItems', 0),
+        'books': books,
+    })
+
+
+@require_http_methods(["GET"])
+def api_list_favorites(request):
+    """GET /api/favorites/ – return all saved favorites."""
+    favorites = FavoriteBook.objects.all()
+    return JsonResponse({'favorites': [f.to_dict() for f in favorites]})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_add_favorite(request):
+    """POST /api/favorites/add/ – save a book to favorites."""
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    google_books_id = payload.get('google_books_id', '').strip()
+    if not google_books_id:
+        return JsonResponse({'error': '"google_books_id" is required.'}, status=400)
+
+    book, created = FavoriteBook.objects.get_or_create(
+        google_books_id=google_books_id,
+        defaults={
+            'title': payload.get('title', ''),
+            'authors': payload.get('authors', ''),
+            'description': payload.get('description', ''),
+            'thumbnail': payload.get('thumbnail', ''),
+            'published_date': payload.get('published_date', ''),
+            'page_count': payload.get('page_count'),
+            'categories': payload.get('categories', ''),
+            'average_rating': payload.get('average_rating'),
+        },
+    )
+
+    status_code = 201 if created else 200
+    return JsonResponse({
+        'message': 'Added to favorites.' if created else 'Already in favorites.',
+        'book': book.to_dict(),
+    }, status=status_code)
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_remove_favorite(request, google_books_id):
+    """DELETE /api/favorites/<google_books_id>/remove/ – remove a book from favorites."""
+    book = get_object_or_404(FavoriteBook, google_books_id=google_books_id)
+    book.delete()
+    return JsonResponse({'message': 'Removed from favorites.'}, status=200)
+
+
+@require_http_methods(["GET"])
+def api_favorite_detail(request, google_books_id):
+    """GET /api/favorites/<google_books_id>/ – check if a book is a favorite."""
+    try:
+        book = FavoriteBook.objects.get(google_books_id=google_books_id)
+        return JsonResponse({'is_favorite': True, 'book': book.to_dict()})
+    except FavoriteBook.DoesNotExist:
+        return JsonResponse({'is_favorite': False})
