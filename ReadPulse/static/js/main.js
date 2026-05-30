@@ -139,25 +139,27 @@ function buildBookCard(book) {
   const rating = book.average_rating
     ? `<span class="book-rating">★ ${book.average_rating}</span>` : '';
 
+  const detailUrl = `/books/${encodeURIComponent(book.google_books_id)}/`;
+
   return `
-    <div class="book-card" data-id="${escHtml(book.google_books_id)}">
-      <div class="book-cover">
-        ${coverHtml}
-        <button class="heart-btn ${book.is_favorite ? 'active' : ''}"
-          aria-label="Save to favorites"
-          data-book='${escAttr(JSON.stringify(book))}'
-          data-active="${book.is_favorite ? '1' : '0'}">
-          ${heartSvg()}
-        </button>
-      </div>
-      <div class="book-info">
-        <div class="book-title">${escHtml(book.title)}</div>
-        <div class="book-author">${escHtml(book.authors || 'Unknown Author')}</div>
-        <div class="book-meta">
-          ${year ? `<span class="book-year">${year}</span>` : ''}
-          ${rating}
+    <div class="book-card" data-id="${escHtml(book.google_books_id)}" role="article">
+      <a href="${detailUrl}" class="book-card-link" aria-label="View details for ${escHtml(book.title)}">
+        <div class="book-cover">${coverHtml}</div>
+        <div class="book-info">
+          <div class="book-title">${escHtml(book.title)}</div>
+          <div class="book-author">${escHtml(book.authors || 'Unknown Author')}</div>
+          <div class="book-meta">
+            ${year ? `<span class="book-year">${year}</span>` : ''}
+            ${rating}
+          </div>
         </div>
-      </div>
+      </a>
+      <button class="heart-btn ${book.is_favorite ? 'active' : ''}"
+        aria-label="Save to favorites"
+        data-book='${escAttr(JSON.stringify(book))}'
+        data-active="${book.is_favorite ? '1' : '0'}">
+        ${heartSvg()}
+      </button>
     </div>`;
 }
 
@@ -273,9 +275,160 @@ function checkFavEmpty() {
   }
 }
 
+// ─── Book Detail Page ─────────────────────────────────────────
+
+function initDetailPage() {
+  if (typeof BOOK_ID === 'undefined') return; // not on detail page
+  loadBookDetail(BOOK_ID);
+}
+
+async function loadBookDetail(id) {
+  try {
+    const res = await fetch(`/api/books/${encodeURIComponent(id)}/`);
+    const data = await res.json();
+    if (!res.ok) {
+      renderDetailError(data.error || 'Could not load book details.');
+      return;
+    }
+    renderBookDetail(data.book);
+  } catch (err) {
+    renderDetailError('Network error. Please try again.');
+  }
+}
+
+function renderDetailError(msg) {
+  document.getElementById('detail-area').innerHTML = `
+    <div class="status-msg">
+      <span class="status-icon">⚠️</span>
+      <p>${msg}</p>
+      <a href="javascript:history.back()" style="color:var(--accent);font-size:0.9rem;">← Go back</a>
+    </div>`;
+}
+
+function renderBookDetail(book) {
+  document.getElementById('detail-heading').textContent = book.title;
+  document.title = `${book.title} – ReadPulse`;
+
+  const coverHtml = book.thumbnail
+    ? `<img src="${escHtml(book.thumbnail)}" alt="${escHtml(book.title)}" class="detail-cover-img">`
+    : `<div class="detail-cover-placeholder">${noImageHtml()}</div>`;
+
+  const stars = book.average_rating
+    ? `${'★'.repeat(Math.round(book.average_rating))}${'☆'.repeat(5 - Math.round(book.average_rating))}`
+    : '';
+
+  const ratingHtml = book.average_rating ? `
+    <div class="detail-rating">
+      <span class="detail-stars">${stars}</span>
+      <span class="detail-rating-num">${book.average_rating} / 5</span>
+      ${book.ratings_count ? `<span class="detail-rating-count">(${book.ratings_count.toLocaleString()} ratings)</span>` : ''}
+    </div>` : '';
+
+  const metaItems = [
+    book.authors     && { label: 'Author',     value: book.authors },
+    book.publisher   && { label: 'Publisher',  value: book.publisher },
+    book.published_date && { label: 'Published', value: book.published_date },
+    book.page_count  && { label: 'Pages',      value: book.page_count.toLocaleString() },
+    book.language    && { label: 'Language',   value: book.language.toUpperCase() },
+    book.categories  && { label: 'Categories', value: book.categories },
+    book.isbn        && { label: 'ISBN',       value: book.isbn },
+  ].filter(Boolean);
+
+  const metaHtml = metaItems.map(m => `
+    <div class="detail-meta-row">
+      <span class="detail-meta-label">${m.label}</span>
+      <span class="detail-meta-value">${escHtml(String(m.value))}</span>
+    </div>`).join('');
+
+  const linksHtml = [
+    book.preview_link && `<a href="${escHtml(book.preview_link)}" target="_blank" rel="noopener" class="btn-detail-link btn-preview">Preview on Google Books</a>`,
+    book.buy_link     && `<a href="${escHtml(book.buy_link)}" target="_blank" rel="noopener" class="btn-detail-link btn-buy">Buy this Book</a>`,
+  ].filter(Boolean).join('');
+
+  const descHtml = book.description
+    ? `<div class="detail-description">${book.description}</div>`
+    : `<p class="detail-no-desc">No description available for this book.</p>`;
+
+  document.getElementById('detail-area').innerHTML = `
+    <div class="detail-layout">
+
+      <!-- Left: Cover + Actions -->
+      <div class="detail-left">
+        <div class="detail-cover">${coverHtml}</div>
+
+        <button class="heart-btn detail-heart ${book.is_favorite ? 'active' : ''}"
+          aria-label="Save to favorites"
+          data-book='${escAttr(JSON.stringify(book))}'
+          data-active="${book.is_favorite ? '1' : '0'}">
+          ${heartSvg()}
+          <span class="detail-heart-label">${book.is_favorite ? 'Saved to Favorites' : 'Save to Favorites'}</span>
+        </button>
+
+        ${linksHtml ? `<div class="detail-links">${linksHtml}</div>` : ''}
+      </div>
+
+      <!-- Right: Info -->
+      <div class="detail-right">
+        <h1 class="detail-title">${escHtml(book.title)}</h1>
+        ${book.subtitle ? `<p class="detail-subtitle">${escHtml(book.subtitle)}</p>` : ''}
+        ${ratingHtml}
+
+        <div class="detail-meta-table">${metaHtml}</div>
+
+        <div class="detail-section-title">About this Book</div>
+        ${descHtml}
+      </div>
+
+    </div>`;
+
+  // Wire up the heart button on the detail page
+  const heartBtn = document.querySelector('.detail-heart');
+  if (heartBtn) {
+    heartBtn.addEventListener('click', () => handleDetailHeart(heartBtn));
+  }
+}
+
+async function handleDetailHeart(btn) {
+  const isActive = btn.dataset.active === '1';
+  const book = JSON.parse(btn.dataset.book);
+  const label = btn.querySelector('.detail-heart-label');
+
+  btn.classList.add('pulse');
+  btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
+
+  if (isActive) {
+    try {
+      const res = await fetch(`/api/favorites/${encodeURIComponent(book.google_books_id)}/remove/`, { method: 'DELETE' });
+      if (res.ok) {
+        btn.dataset.active = '0';
+        btn.classList.remove('active');
+        if (label) label.textContent = 'Save to Favorites';
+        showToast('Removed from favorites.', 'success');
+        updateFavBadge(-1);
+      } else { showToast('Failed to remove.', 'error'); }
+    } catch { showToast('Network error.', 'error'); }
+  } else {
+    try {
+      const res = await fetch('/api/favorites/add/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(book),
+      });
+      if (res.ok) {
+        btn.dataset.active = '1';
+        btn.classList.add('active');
+        if (label) label.textContent = 'Saved to Favorites';
+        showToast('Saved to favorites! ❤️', 'success');
+        updateFavBadge(1);
+      } else { showToast('Failed to save.', 'error'); }
+    } catch { showToast('Network error.', 'error'); }
+  }
+}
+
 // ─── Init ─────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', () => {
   initSearchPage();
   initFavoritesPage();
+  initDetailPage();
 });

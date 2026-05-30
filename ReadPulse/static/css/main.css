@@ -669,3 +669,297 @@ body {
   .topbar { padding: 16px 20px; }
   .books-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
 }
+
+/* ─── Back Button ─── */
+.back-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+  flex-shrink: 0;
+}
+.back-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+/* ─── Book Card – clickable link ─── */
+.book-card {
+  position: relative;
+}
+.book-card-link {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+.book-card-link:hover .book-title {
+  color: var(--accent);
+}
+.book-card .heart-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+}
+
+/* ─── Detail Page – skeleton ─── */
+.detail-skeleton {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 40px;
+  max-width: 900px;
+}
+.detail-skeleton-cover {
+  width: 100%;
+  padding-top: 150%;
+  border-radius: var(--radius);
+  background: linear-gradient(90deg, var(--border-light) 25%, var(--border) 50%, var(--border-light) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+.detail-skeleton-body {
+  padding-top: 12px;
+}
+
+/* ─── Detail Page – layout ─── */
+.detail-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 48px;
+  max-width: 960px;
+}
+
+.detail-left {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.detail-cover {
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow-md);
+  background: var(--surface);
+  aspect-ratio: 2/3;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.detail-cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.detail-cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-hover);
+}
+
+/* Heart button on detail page */
+.detail-heart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition), color var(--transition);
+  position: static !important;
+  top: auto !important;
+  right: auto !important;
+  width: 100% !important;
+  height: auto !important;
+}
+.detail-heart svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  flex-shrink: 0;
+}
+.detail-heart:hover {
+  background: var(--heart-active);
+  border-color: #f5c6c6;
+  color: var(--heart);
+}
+.detail-heart.active {
+  background: var(--heart-active);
+  border-color: #f5c6c6;
+  color: var(--heart);
+}
+.detail-heart.active svg {
+  fill: var(--heart);
+  stroke: var(--heart);
+}
+
+.detail-links {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.btn-detail-link {
+  display: block;
+  text-align: center;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  font-size: 0.83rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: background var(--transition), color var(--transition);
+}
+.btn-preview {
+  background: var(--accent-light);
+  color: var(--accent);
+  border: 1.5px solid transparent;
+}
+.btn-preview:hover {
+  background: var(--accent-light-hover);
+}
+.btn-buy {
+  background: var(--accent);
+  color: #fff;
+}
+.btn-buy:hover {
+  background: var(--accent-hover);
+}
+
+/* Right column */
+.detail-right {
+  padding-top: 4px;
+}
+.detail-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+  margin-bottom: 6px;
+}
+.detail-subtitle {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin-bottom: 12px;
+  font-style: italic;
+}
+.detail-rating {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.detail-stars {
+  color: #f59e0b;
+  font-size: 1.1rem;
+  letter-spacing: 1px;
+}
+.detail-rating-num {
+  font-weight: 600;
+  color: var(--text-primary);
+  font-size: 0.9rem;
+}
+.detail-rating-count {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+}
+
+.detail-meta-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 28px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.detail-meta-row {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.86rem;
+}
+.detail-meta-row:last-child {
+  border-bottom: none;
+}
+.detail-meta-label {
+  width: 110px;
+  flex-shrink: 0;
+  padding: 9px 14px;
+  background: var(--surface-hover);
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-right: 1px solid var(--border-light);
+}
+.detail-meta-value {
+  flex: 1;
+  padding: 9px 14px;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+.detail-section-title {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+}
+.detail-description {
+  font-size: 0.92rem;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+.detail-no-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+/* ─── Responsive for detail page ─── */
+@media (max-width: 700px) {
+  .detail-layout, .detail-skeleton {
+    grid-template-columns: 1fr;
+  }
+  .detail-cover {
+    max-width: 180px;
+    margin: 0 auto;
+  }
+  .detail-left {
+    align-items: center;
+  }
+  .detail-heart, .detail-links { width: 100%; }
+}
+
+/* ─── Favorites card – remove button above the link ─── */
+.fav-card {
+  position: relative;
+}
+.fav-card .remove-btn {
+  z-index: 2;
+}
+.fav-card .book-card-link {
+  display: flex;
+  flex-direction: column;
+}

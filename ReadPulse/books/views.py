@@ -22,6 +22,15 @@ def search_page(request):
     return render(request, 'books/search.html', {'fav_count': fav_count})
 
 
+def book_detail_page(request, google_books_id):
+    """Render the Book Detail page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/book_detail.html', {
+        'google_books_id': google_books_id,
+        'fav_count': fav_count,
+    })
+
+
 def favorites_page(request):
     """Render the Favorites page."""
     favorites = FavoriteBook.objects.all()
@@ -34,6 +43,76 @@ def favorites_page(request):
 # ─────────────────────────────────────────────
 # RESTful API  –  /api/...
 # ─────────────────────────────────────────────
+
+@require_http_methods(["GET"])
+def api_book_detail(request, google_books_id):
+    """
+    GET /api/books/<google_books_id>/ – fetch a single book's full details from Google Books API.
+    """
+    api_key = getattr(settings, 'GOOGLE_BOOKS_API_KEY', '').strip()
+    if not api_key:
+        return JsonResponse({'error': 'Google Books API key is not configured on the server.'}, status=500)
+
+    url = f'https://www.googleapis.com/books/v1/volumes/{urllib.parse.quote(google_books_id)}?key={api_key}'
+
+    try:
+        with urllib.request.urlopen(url, timeout=10) as resp:
+            item = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        body = e.read().decode('utf-8')
+        try:
+            err_json = json.loads(body)
+            msg = err_json.get('error', {}).get('message', str(e))
+        except Exception:
+            msg = str(e)
+        return JsonResponse({'error': msg}, status=e.code)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    info = item.get('volumeInfo', {})
+    sale_info = item.get('saleInfo', {})
+    image_links = info.get('imageLinks', {})
+
+    # Prefer largest available image
+    thumbnail = (
+        image_links.get('extraLarge', '')
+        or image_links.get('large', '')
+        or image_links.get('medium', '')
+        or image_links.get('small', '')
+        or image_links.get('thumbnail', '')
+        or image_links.get('smallThumbnail', '')
+    )
+    if thumbnail.startswith('http://'):
+        thumbnail = thumbnail.replace('http://', 'https://', 1)
+
+    favorite_ids = set(FavoriteBook.objects.values_list('google_books_id', flat=True))
+
+    book = {
+        'google_books_id': google_books_id,
+        'title': info.get('title', 'Unknown Title'),
+        'subtitle': info.get('subtitle', ''),
+        'authors': ', '.join(info.get('authors', [])),
+        'description': info.get('description', ''),
+        'thumbnail': thumbnail,
+        'published_date': info.get('publishedDate', ''),
+        'page_count': info.get('pageCount'),
+        'categories': ', '.join(info.get('categories', [])),
+        'average_rating': info.get('averageRating'),
+        'ratings_count': info.get('ratingsCount'),
+        'language': info.get('language', ''),
+        'publisher': info.get('publisher', ''),
+        'isbn': next(
+            (id_['identifier'] for id_ in info.get('industryIdentifiers', []) if id_['type'] == 'ISBN_13'),
+            next((id_['identifier'] for id_ in info.get('industryIdentifiers', [])), '')
+        ),
+        'preview_link': info.get('previewLink', ''),
+        'info_link': info.get('infoLink', ''),
+        'buy_link': sale_info.get('buyLink', ''),
+        'is_favorite': google_books_id in favorite_ids,
+    }
+
+    return JsonResponse({'book': book})
+
 
 @require_http_methods(["GET"])
 def api_search_books(request):
