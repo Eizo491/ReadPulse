@@ -364,6 +364,14 @@ function renderBookDetail(book) {
           <span class="detail-heart-label">${book.is_favorite ? 'Saved to Favorites' : 'Save to Favorites'}</span>
         </button>
 
+        <button class="btn-read-book" id="btn-read-book" data-id="${escHtml(book.google_books_id)}" data-title="${escAttr(book.title)}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/>
+            <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/>
+          </svg>
+          Read Book
+        </button>
+
         ${linksHtml ? `<div class="detail-links">${linksHtml}</div>` : ''}
       </div>
 
@@ -385,6 +393,12 @@ function renderBookDetail(book) {
   const heartBtn = document.querySelector('.detail-heart');
   if (heartBtn) {
     heartBtn.addEventListener('click', () => handleDetailHeart(heartBtn));
+  }
+
+  // Wire up the Read Book button
+  const readBtn = document.getElementById('btn-read-book');
+  if (readBtn) {
+    readBtn.addEventListener('click', () => openReader(book));
   }
 }
 
@@ -427,8 +441,98 @@ async function handleDetailHeart(btn) {
 
 // ─── Init ─────────────────────────────────────────────────────
 
+
+// Reader Modal
+let googleBooksApiLoaded = false;
+
+function initReaderModal() {
+  const modal = document.getElementById('reader-modal');
+  const closeBtn = document.getElementById('reader-close-btn');
+  if (!modal) return;
+
+  closeBtn.addEventListener('click', closeReader);
+  modal.addEventListener('click', e => { if (e.target === modal) closeReader(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeReader(); });
+
+  if (typeof google !== 'undefined' && google.books && google.books.DefaultViewer) {
+    googleBooksApiLoaded = true;
+  } else if (typeof google !== 'undefined' && google.books) {
+    google.books.load();
+    google.books.setOnLoadCallback(() => { googleBooksApiLoaded = true; });
+  }
+}
+
+function openReader(book) {
+  const modal = document.getElementById('reader-modal');
+  const titleEl = document.getElementById('reader-modal-title');
+  const viewerEl = document.getElementById('reader-viewer');
+  const unavailableEl = document.getElementById('reader-unavailable');
+  const fallbackLinks = document.getElementById('reader-fallback-links');
+
+  viewerEl.innerHTML = '';
+  viewerEl.style.display = 'block';
+  unavailableEl.hidden = true;
+  titleEl.textContent = book.title;
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  viewerEl.innerHTML = `
+    <div style="display:flex;align-items:center;justify-content:center;height:100%;flex-direction:column;gap:12px;color:var(--text-muted);">
+      <div class="reader-spinner"></div>
+      <span style="font-size:0.9rem;">Loading preview\u2026</span>
+    </div>`;
+
+  function tryEmbed() {
+    viewerEl.innerHTML = '';
+    const viewer = new google.books.DefaultViewer(viewerEl);
+    viewer.load(
+      book.google_books_id,
+      () => {
+        viewerEl.style.display = 'none';
+        unavailableEl.hidden = false;
+        fallbackLinks.innerHTML = [
+          book.preview_link ? `<a href="${escHtml(book.preview_link)}" target="_blank" rel="noopener" class="btn-detail-link btn-preview">Open on Google Books</a>` : '',
+          book.buy_link     ? `<a href="${escHtml(book.buy_link)}" target="_blank" rel="noopener" class="btn-detail-link btn-buy">Buy this Book</a>` : '',
+        ].join('');
+      },
+      () => {}
+    );
+  }
+
+  if (googleBooksApiLoaded) {
+    tryEmbed();
+  } else {
+    let tries = 0;
+    const poll = setInterval(() => {
+      tries++;
+      if (typeof google !== 'undefined' && google.books && google.books.DefaultViewer) {
+        clearInterval(poll);
+        googleBooksApiLoaded = true;
+        tryEmbed();
+      } else if (tries > 30) {
+        clearInterval(poll);
+        viewerEl.style.display = 'none';
+        unavailableEl.hidden = false;
+        fallbackLinks.innerHTML = book.preview_link
+          ? `<a href="${escHtml(book.preview_link)}" target="_blank" rel="noopener" class="btn-detail-link btn-preview">Open on Google Books</a>`
+          : '';
+      }
+    }, 100);
+  }
+}
+
+function closeReader() {
+  const modal = document.getElementById('reader-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+  const viewerEl = document.getElementById('reader-viewer');
+  if (viewerEl) viewerEl.innerHTML = '';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initSearchPage();
   initFavoritesPage();
   initDetailPage();
+  initReaderModal();
 });
