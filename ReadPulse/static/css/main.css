@@ -1121,3 +1121,87 @@ body {
     max-width: 100%;
   }
 }
+
+/* ─── Pagination Bar ──────────────────────────────────────── */
+
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 32px 0 16px;
+  padding: 0 4px;
+}
+
+.btn-page {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 20px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s, transform 0.1s;
+}
+
+.btn-page:hover:not(:disabled) {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  transform: translateY(-1px);
+}
+
+.btn-page:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  min-width: 60px;
+  text-align: center;
+}
+
+.pagination-info {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  margin-left: auto;
+}
+
+.results-info {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+/* ─── Featured Books Header ──────────────────────────────── */
+
+.featured-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--border);
+}
+
+.featured-label {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.featured-hint {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}

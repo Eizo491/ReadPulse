@@ -43,6 +43,12 @@ function heartSvg() {
 
 // ─── Search Page ──────────────────────────────────────────────
 
+// Pagination state
+let currentQuery = '';
+let currentStartIndex = 0;
+let currentTotalItems = 0;
+const PAGE_SIZE = 24;
+
 function initSearchPage() {
   const searchInput = document.getElementById('search-input');
   if (!searchInput) return; // not on search page
@@ -51,22 +57,112 @@ function initSearchPage() {
 
   searchForm.addEventListener('submit', e => {
     e.preventDefault();
-    doSearch(searchInput.value.trim());
+    const q = searchInput.value.trim();
+    if (!q) return;
+    currentStartIndex = 0;
+    saveSearchState(q, 0);
+    doSearch(q, 0);
   });
 
   searchInput.focus();
+
+  // Restore previous search or load popular books
+  const saved = getSavedSearchState();
+  if (saved && saved.query) {
+    searchInput.value = saved.query;
+    doSearch(saved.query, saved.startIndex || 0);
+  } else {
+    loadFeaturedBooks();
+  }
 }
 
-let currentQuery = '';
+function saveSearchState(query, startIndex) {
+  sessionStorage.setItem('rp_search', JSON.stringify({ query, startIndex }));
+}
 
-async function doSearch(query) {
-  if (!query) return;
+function getSavedSearchState() {
+  try { return JSON.parse(sessionStorage.getItem('rp_search')); }
+  catch { return null; }
+}
 
+function clearSearchState() {
+  sessionStorage.removeItem('rp_search');
+}
+
+async function loadFeaturedBooks() {
+  const area = document.getElementById('results-area');
+
+  // Show a soft loading state
+  area.innerHTML = `
+    <div class="featured-header">
+      <span class="featured-label">🔥 Popular Books</span>
+      <span class="featured-hint">Search above to find any book</span>
+    </div>
+    <div class="skeleton-grid">${Array.from({ length: 12 }, () => `
+      <div class="skeleton-card">
+        <div class="skeleton-cover"></div>
+        <div class="skeleton-info">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </div>`).join('')}</div>`;
+
+  // Rotate through a few curated high-rating queries so results feel fresh
+  const featuredQueries = [
+    'bestseller fiction',
+    'popular novels',
+    'most read books',
+    'trending books',
+  ];
+  const q = featuredQueries[Math.floor(Math.random() * featuredQueries.length)];
+
+  try {
+    const params = new URLSearchParams({ q, max_results: 24 });
+    const res = await fetch(`/api/search/?${params}`);
+    const data = await res.json();
+
+    if (!res.ok || !data.books || data.books.length === 0) {
+      // Fallback: show a friendly message if featured load fails
+      area.innerHTML = `
+        <div class="status-msg">
+          <span class="status-icon">📚</span>
+          <p>Search for a book to get started.</p>
+          <p class="status-hint">Try "Harry Potter", "Atomic Habits", or any author name.</p>
+        </div>`;
+      return;
+    }
+
+    // Sort by rating descending
+    const sorted = [...data.books].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
+
+    const cards = sorted.map(book => buildBookCard(book)).join('');
+    area.innerHTML = `
+      <div class="featured-header">
+        <span class="featured-label">🔥 Popular Books</span>
+        <span class="featured-hint">Search above to find any book</span>
+      </div>
+      <div class="books-grid">${cards}</div>`;
+
+    area.querySelectorAll('.heart-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleHeart(btn));
+    });
+  } catch (err) {
+    area.innerHTML = `
+      <div class="status-msg">
+        <span class="status-icon">📚</span>
+        <p>Search for a book to get started.</p>
+        <p class="status-hint">Try "Harry Potter", "Atomic Habits", or any author name.</p>
+      </div>`;
+  }
+}
+
+async function doSearch(query, startIndex = 0) {
   currentQuery = query;
+  currentStartIndex = startIndex;
   showLoading();
 
   try {
-    const params = new URLSearchParams({ q: query, max_results: 24 });
+    const params = new URLSearchParams({ q: query, max_results: PAGE_SIZE, start_index: startIndex });
     const res = await fetch(`/api/search/?${params}`);
     const data = await res.json();
 
@@ -75,7 +171,8 @@ async function doSearch(query) {
       return;
     }
 
-    renderResults(data, query);
+    currentTotalItems = data.total_items || 0;
+    renderResults(data, query, startIndex);
   } catch (err) {
     showError('Network error. Please try again.');
   }
@@ -103,7 +200,7 @@ function showError(msg) {
     </div>`;
 }
 
-function renderResults(data, query) {
+function renderResults(data, query, startIndex) {
   const area = document.getElementById('results-area');
   const { books, total_items } = data;
 
@@ -117,17 +214,49 @@ function renderResults(data, query) {
     return;
   }
 
+  const pageNum = Math.floor(startIndex / PAGE_SIZE) + 1;
+  const totalPages = Math.ceil(Math.min(total_items, 1000) / PAGE_SIZE); // Google Books caps at ~1000
+  const hasPrev = startIndex > 0;
+  const hasNext = startIndex + books.length < Math.min(total_items, 1000);
+
   const infoBar = `
     <div class="results-info">
-      <div class="results-count">Showing <strong>${books.length}</strong> of ${total_items.toLocaleString()} results for "<strong>${escHtml(query)}</strong>"</div>
+      <div class="results-count">
+        Showing <strong>${startIndex + 1}–${startIndex + books.length}</strong> of ${total_items.toLocaleString()} results for "<strong>${escHtml(query)}</strong>"
+      </div>
+      <div class="pagination-info">Page ${pageNum} of ${totalPages.toLocaleString()}</div>
     </div>`;
 
   const cards = books.map(book => buildBookCard(book)).join('');
-  area.innerHTML = `${infoBar}<div class="books-grid">${cards}</div>`;
+
+  const pagination = `
+    <div class="pagination-bar">
+      <button class="btn-page btn-prev" ${hasPrev ? '' : 'disabled'} onclick="goToPage(${startIndex - PAGE_SIZE})">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+        Previous
+      </button>
+      <span class="page-indicator">Page ${pageNum}</span>
+      <button class="btn-page btn-next" ${hasNext ? '' : 'disabled'} onclick="goToPage(${startIndex + PAGE_SIZE})">
+        Next
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+      </button>
+    </div>`;
+
+  area.innerHTML = `${infoBar}<div class="books-grid">${cards}</div>${pagination}`;
 
   area.querySelectorAll('.heart-btn').forEach(btn => {
     btn.addEventListener('click', () => handleHeart(btn));
   });
+
+  // Scroll to top of results
+  area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function goToPage(startIndex) {
+  if (!currentQuery) return;
+  const idx = Math.max(0, startIndex);
+  saveSearchState(currentQuery, idx);
+  doSearch(currentQuery, idx);
 }
 
 function buildBookCard(book) {
@@ -535,4 +664,19 @@ document.addEventListener('DOMContentLoaded', () => {
   initFavoritesPage();
   initDetailPage();
   initReaderModal();
+});
+
+// Re-load state when user navigates back (bfcache restore)
+window.addEventListener('pageshow', e => {
+  if (e.persisted) {
+    const searchInput = document.getElementById('search-input');
+    if (!searchInput) return;
+    const saved = getSavedSearchState();
+    if (saved && saved.query) {
+      searchInput.value = saved.query;
+      doSearch(saved.query, saved.startIndex || 0);
+    } else if (!currentQuery) {
+      loadFeaturedBooks();
+    }
+  }
 });

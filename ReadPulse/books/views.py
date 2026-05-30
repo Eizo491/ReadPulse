@@ -117,12 +117,13 @@ def api_book_detail(request, google_books_id):
 @require_http_methods(["GET"])
 def api_search_books(request):
     """
-    GET /api/search/?q=<query>&max_results=<n>
+    GET /api/search/?q=<query>&max_results=<n>&start_index=<n>
     Proxy the Google Books API and return JSON.
     API key is read from settings.GOOGLE_BOOKS_API_KEY.
     """
     query = request.GET.get('q', '').strip()
     max_results = request.GET.get('max_results', '20')
+    start_index = request.GET.get('start_index', '0')
     api_key = getattr(settings, 'GOOGLE_BOOKS_API_KEY', '').strip()
 
     if not query:
@@ -135,10 +136,15 @@ def api_search_books(request):
     except ValueError:
         max_results = 20
 
+    try:
+        start_index = max(0, int(start_index))
+    except ValueError:
+        start_index = 0
+
     encoded_query = urllib.parse.quote(query)
     url = (
         f'https://www.googleapis.com/books/v1/volumes'
-        f'?q={encoded_query}&maxResults={max_results}&key={api_key}'
+        f'?q={encoded_query}&maxResults={max_results}&startIndex={start_index}&key={api_key}'
     )
 
     try:
@@ -186,6 +192,8 @@ def api_search_books(request):
 
     return JsonResponse({
         'total_items': data.get('totalItems', 0),
+        'start_index': start_index,
+        'max_results': max_results,
         'books': books,
     })
 
