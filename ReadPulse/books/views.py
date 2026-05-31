@@ -199,6 +199,81 @@ def api_search_books(request):
 
 
 @require_http_methods(["GET"])
+def api_search_audiobooks(request):
+    """
+    GET /api/search-audiobooks/?q=<query>&page=<n>
+    Search LibriVox for free public domain audiobooks.
+    """
+    query = request.GET.get('q', '').strip()
+    page = request.GET.get('page', '1')
+
+    if not query:
+        return JsonResponse({'error': 'Query parameter "q" is required.'}, status=400)
+
+    try:
+        page = max(1, int(page))
+    except ValueError:
+        page = 1
+
+    limit = 12
+    offset = (page - 1) * limit
+
+    encoded_query = urllib.parse.quote(query)
+    url = (
+        f'https://librivox.org/api/feed/audiobooks'
+        f'?title={encoded_query}&extended=1&format=json&limit={limit}&offset={offset}'
+    )
+
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'ReadPulse/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        return JsonResponse({'audiobooks': [], 'total_results': 0, 'page': page})
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    books_raw = data.get('books', []) or []
+    audiobooks = []
+
+    for ab in books_raw:
+        # Build cover: LibriVox doesn't always have covers; use their default
+        cover = ab.get('url_zip_file', '')  # placeholder, we'll use a generic approach
+
+        # Authors from the readers/authors list
+        authors_list = ab.get('authors', []) or []
+        author_names = ', '.join(
+            f"{a.get('first_name', '')} {a.get('last_name', '')}".strip()
+            for a in authors_list
+            if a.get('first_name') or a.get('last_name')
+        ) or 'Unknown Author'
+
+        audiobooks.append({
+            'id': ab.get('id', ''),
+            'title': ab.get('title', 'Unknown Title').strip(),
+            'authors': author_names,
+            'description': ab.get('description', '').strip(),
+            'url_librivox': ab.get('url_librivox', ''),
+            'url_rss': ab.get('url_rss', ''),
+            'url_zip_file': ab.get('url_zip_file', ''),
+            'language': ab.get('language', ''),
+            'published': ab.get('copyright_year', ''),
+            'num_sections': ab.get('num_sections', ''),
+            'totaltime': ab.get('totaltime', ''),
+        })
+
+    # LibriVox API doesn't return total count cleanly; estimate from response size
+    total_results = len(books_raw) + offset if len(books_raw) == limit else offset + len(books_raw)
+
+    return JsonResponse({
+        'audiobooks': audiobooks,
+        'total_results': total_results,
+        'page': page,
+        'limit': limit,
+    })
+
+
+@require_http_methods(["GET"])
 def api_list_favorites(request):
     """GET /api/favorites/ – return all saved favorites."""
     favorites = FavoriteBook.objects.all()

@@ -162,17 +162,23 @@ async function doSearch(query, startIndex = 0) {
   showLoading();
 
   try {
-    const params = new URLSearchParams({ q: query, max_results: PAGE_SIZE, start_index: startIndex });
-    const res = await fetch(`/api/search/?${params}`);
-    const data = await res.json();
+    // Fetch books (Open Library) and audiobooks (LibriVox) in parallel
+    const booksPage = Math.floor(startIndex / PAGE_SIZE) + 1;
+    const [booksRes, abRes] = await Promise.all([
+      fetch(`/api/search/?${new URLSearchParams({ q: query, max_results: PAGE_SIZE, start_index: startIndex })}`),
+      fetch(`/api/search-audiobooks/?${new URLSearchParams({ q: query, page: booksPage })}`),
+    ]);
 
-    if (!res.ok) {
-      showError(data.error || 'Something went wrong.');
+    const booksData = await booksRes.json();
+    const abData = await abRes.json();
+
+    if (!booksRes.ok) {
+      showError(booksData.error || 'Something went wrong.');
       return;
     }
 
-    currentTotalItems = data.total_items || 0;
-    renderResults(data, query, startIndex);
+    currentTotalItems = booksData.total_items || 0;
+    renderResults(booksData, abData, query, startIndex);
   } catch (err) {
     showError('Network error. Please try again.');
   }
@@ -200,49 +206,86 @@ function showError(msg) {
     </div>`;
 }
 
-function renderResults(data, query, startIndex) {
+function renderResults(booksData, abData, query, startIndex) {
   const area = document.getElementById('results-area');
-  const { books, total_items } = data;
+  const { books, total_items } = booksData;
+  const audiobooks = abData ? (abData.audiobooks || []) : [];
 
-  if (!books || books.length === 0) {
+  if ((!books || books.length === 0) && audiobooks.length === 0) {
     area.innerHTML = `
       <div class="status-msg">
         <span class="status-icon">📭</span>
-        <p>No books found for "<strong>${escHtml(query)}</strong>".</p>
+        <p>No results found for "<strong>${escHtml(query)}</strong>".</p>
         <p class="status-hint">Try a different search term.</p>
       </div>`;
     return;
   }
 
   const pageNum = Math.floor(startIndex / PAGE_SIZE) + 1;
-  const totalPages = Math.ceil(Math.min(total_items, 1000) / PAGE_SIZE); // Google Books caps at ~1000
+  const totalPages = Math.ceil(Math.min(total_items, 1000) / PAGE_SIZE);
   const hasPrev = startIndex > 0;
-  const hasNext = startIndex + books.length < Math.min(total_items, 1000);
+  const hasNext = books && books.length > 0 && startIndex + books.length < Math.min(total_items, 1000);
 
-  const infoBar = `
-    <div class="results-info">
-      <div class="results-count">
-        Showing <strong>${startIndex + 1}–${startIndex + books.length}</strong> of ${total_items.toLocaleString()} results for "<strong>${escHtml(query)}</strong>"
+  // ── Books section ──
+  let booksSection = '';
+  if (books && books.length > 0) {
+    const infoBar = `
+      <div class="results-info">
+        <div class="results-count">
+          <strong>📖 Books</strong> — Showing <strong>${startIndex + 1}–${startIndex + books.length}</strong> of ${total_items.toLocaleString()} results for "<strong>${escHtml(query)}</strong>"
+        </div>
+        <div class="pagination-info">Page ${pageNum} of ${totalPages.toLocaleString()}</div>
+      </div>`;
+
+    const cards = books.map(book => buildBookCard(book)).join('');
+
+    const pagination = `
+      <div class="pagination-bar">
+        <button class="btn-page btn-prev" ${hasPrev ? '' : 'disabled'} onclick="goToPage(${startIndex - PAGE_SIZE})">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
+          Previous
+        </button>
+        <span class="page-indicator">Page ${pageNum}</span>
+        <button class="btn-page btn-next" ${hasNext ? '' : 'disabled'} onclick="goToPage(${startIndex + PAGE_SIZE})">
+          Next
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
+        </button>
+      </div>`;
+
+    booksSection = `${infoBar}<div class="books-grid">${cards}</div>${pagination}`;
+  } else {
+    booksSection = `
+      <div class="results-section-header">📖 Books</div>
+      <div class="status-msg status-msg-inline">
+        <span class="status-icon">📭</span>
+        <p>No books found for "<strong>${escHtml(query)}</strong>".</p>
+      </div>`;
+  }
+
+  // ── Audiobooks section ──
+  let abSection = '';
+  if (audiobooks.length > 0) {
+    const abCards = audiobooks.map(ab => buildAudiobookCard(ab)).join('');
+    abSection = `
+      <div class="results-section-divider"></div>
+      <div class="results-info">
+        <div class="results-count"><strong>🎧 Audiobooks</strong> — Free public domain audiobooks from LibriVox</div>
       </div>
-      <div class="pagination-info">Page ${pageNum} of ${totalPages.toLocaleString()}</div>
-    </div>`;
+      <div class="books-grid">${abCards}</div>`;
+  } else {
+    abSection = `
+      <div class="results-section-divider"></div>
+      <div class="results-info">
+        <div class="results-count"><strong>🎧 Audiobooks</strong></div>
+      </div>
+      <div class="status-msg status-msg-inline">
+        <span class="status-icon">🎙️</span>
+        <p>No audiobooks found for "<strong>${escHtml(query)}</strong>".</p>
+        <p class="status-hint">LibriVox offers free public domain recordings.</p>
+      </div>`;
+  }
 
-  const cards = books.map(book => buildBookCard(book)).join('');
-
-  const pagination = `
-    <div class="pagination-bar">
-      <button class="btn-page btn-prev" ${hasPrev ? '' : 'disabled'} onclick="goToPage(${startIndex - PAGE_SIZE})">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M15 18l-6-6 6-6"/></svg>
-        Previous
-      </button>
-      <span class="page-indicator">Page ${pageNum}</span>
-      <button class="btn-page btn-next" ${hasNext ? '' : 'disabled'} onclick="goToPage(${startIndex + PAGE_SIZE})">
-        Next
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18l6-6-6-6"/></svg>
-      </button>
-    </div>`;
-
-  area.innerHTML = `${infoBar}<div class="books-grid">${cards}</div>${pagination}`;
+  area.innerHTML = booksSection + abSection;
 
   area.querySelectorAll('.heart-btn').forEach(btn => {
     btn.addEventListener('click', () => handleHeart(btn));
@@ -250,6 +293,38 @@ function renderResults(data, query, startIndex) {
 
   // Scroll to top of results
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function buildAudiobookCard(ab) {
+  const detailUrl = ab.url_librivox || '#';
+  const title = escHtml(ab.title || 'Unknown Title');
+  const author = escHtml(ab.authors || 'Unknown Author');
+  const lang = ab.language ? `<span class="book-year">${escHtml(ab.language)}</span>` : '';
+  const duration = ab.totaltime ? `<span class="book-rating">⏱ ${escHtml(ab.totaltime)}</span>` : '';
+  const year = ab.published ? `<span class="book-year">${escHtml(String(ab.published))}</span>` : '';
+
+  return `
+    <div class="book-card audiobook-card" role="article">
+      <a href="${detailUrl}" target="_blank" rel="noopener" class="book-card-link" aria-label="Listen to ${title} on LibriVox">
+        <div class="book-cover audiobook-cover-placeholder">
+          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          <span>Audiobook</span>
+        </div>
+        <div class="book-info">
+          <div class="book-title">${title}</div>
+          <div class="book-author">${author}</div>
+          <div class="book-meta">
+            ${year}${lang}${duration}
+          </div>
+        </div>
+      </a>
+      ${ab.url_librivox ? `
+      <a href="${escHtml(ab.url_librivox)}" target="_blank" rel="noopener"
+         class="audiobook-listen-btn" aria-label="Listen on LibriVox" title="Listen on LibriVox">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
+        Listen
+      </a>` : ''}
+    </div>`;
 }
 
 function goToPage(startIndex) {
@@ -269,7 +344,6 @@ function buildBookCard(book) {
     ? `<span class="book-rating">★ ${book.average_rating}</span>` : '';
 
   const detailUrl = `/books/${encodeURIComponent(book.google_books_id)}/`;
-
   return `
     <div class="book-card" data-id="${escHtml(book.google_books_id)}" role="article">
       <a href="${detailUrl}" class="book-card-link" aria-label="View details for ${escHtml(book.title)}">

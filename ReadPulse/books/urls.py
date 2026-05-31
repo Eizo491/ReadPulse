@@ -9,6 +9,7 @@ urlpatterns = [
 
     # RESTful API routes
     path('api/search/', views.api_search_books, name='api_search'),
+    path('api/search-audiobooks/', views.api_search_audiobooks, name='api_search_audiobooks'),
     path('api/books/<str:google_books_id>/', views.api_book_detail, name='api_book_detail'),
     path('api/favorites/', views.api_list_favorites, name='api_favorites_list'),
     path('api/favorites/add/', views.api_add_favorite, name='api_favorites_add'),
