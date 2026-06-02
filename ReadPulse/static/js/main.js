@@ -4,6 +4,14 @@
 
 // ─── Utilities ────────────────────────────────────────────────
 
+// Safe book data store — avoids JSON-in-HTML-attribute quoting bugs
+const _bookStore = {};
+function storeBook(book) {
+  const key = book.google_books_id || ('manual_' + Math.random().toString(36).slice(2));
+  _bookStore[key] = book;
+  return key;
+}
+function getBook(key) { return _bookStore[key] || null; }
 
 function showToast(message, type = 'success') {
   const container = document.getElementById('toast-container');
@@ -335,6 +343,9 @@ function goToPage(startIndex) {
 }
 
 function buildBookCard(book) {
+  // Store book in JS map to avoid JSON-in-HTML-attribute quoting bugs
+  const storeKey = storeBook(book);
+
   const coverHtml = book.thumbnail
     ? `<img src="${escHtml(book.thumbnail)}" alt="${escHtml(book.title)}" loading="lazy" onerror="this.parentElement.innerHTML=noImageHtml()">`
     : noImageHtml();
@@ -359,7 +370,7 @@ function buildBookCard(book) {
       </a>
       <button class="heart-btn ${book.is_favorite ? 'active' : ''}"
         aria-label="Save to favorites"
-        data-book='${escAttr(JSON.stringify(book))}'
+        data-store-key="${escAttr(storeKey)}"
         data-active="${book.is_favorite ? '1' : '0'}">
         ${heartSvg()}
       </button>
@@ -370,7 +381,8 @@ function buildBookCard(book) {
 
 async function handleHeart(btn) {
   const isActive = btn.dataset.active === '1';
-  const book = JSON.parse(btn.dataset.book);
+  const book = getBook(btn.dataset.storeKey);
+  if (!book) return;
 
   btn.classList.add('pulse');
   btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
@@ -509,6 +521,9 @@ function renderDetailError(msg) {
 }
 
 function renderBookDetail(book) {
+  // Store book safely
+  const storeKey = storeBook(book);
+
   document.getElementById('detail-heading').textContent = book.title;
   document.title = `${book.title} – ReadPulse`;
 
@@ -561,7 +576,7 @@ function renderBookDetail(book) {
 
         <button class="heart-btn detail-heart ${book.is_favorite ? 'active' : ''}"
           aria-label="Save to favorites"
-          data-book='${escAttr(JSON.stringify(book))}'
+          data-store-key="${escAttr(storeKey)}"
           data-active="${book.is_favorite ? '1' : '0'}">
           ${heartSvg()}
           <span class="detail-heart-label">${book.is_favorite ? 'Saved to Favorites' : 'Save to Favorites'}</span>
@@ -607,7 +622,8 @@ function renderBookDetail(book) {
 
 async function handleDetailHeart(btn) {
   const isActive = btn.dataset.active === '1';
-  const book = JSON.parse(btn.dataset.book);
+  const book = getBook(btn.dataset.storeKey);
+  if (!book) return;
   const label = btn.querySelector('.detail-heart-label');
 
   btn.classList.add('pulse');

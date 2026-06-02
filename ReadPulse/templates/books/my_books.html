@@ -1,0 +1,51 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}My Listed Books – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div class="page-header-inner">
+    <h1 class="page-title">My Listed Books</h1>
+    <p class="page-subtitle">Books you've shared with the community — edit or remove them anytime.</p>
+  </div>
+  <a href="/community/" class="btn-outline">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+      <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+    </svg>
+    Browse Community Books
+  </a>
+</div>
+
+<div class="page-content">
+  <div class="community-stats-bar" id="my-books-stats"></div>
+
+  <!-- Loading -->
+  <div id="my-books-loading" class="community-loading">
+    <div class="spinner"></div>
+    <span>Loading your books…</span>
+  </div>
+
+  <!-- Empty state -->
+  <div id="my-books-empty" class="community-empty" style="display:none">
+    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+    <div class="empty-title">No books listed yet</div>
+    <div class="empty-sub">Head to Community Books and click <strong>List a Book</strong> to share one with the community.</div>
+    <a href="/community/" class="btn-primary" style="margin-top:1rem">Go to Community Books</a>
+  </div>
+
+  <!-- Grid -->
+  <div class="community-grid" id="my-books-grid" style="display:none"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}

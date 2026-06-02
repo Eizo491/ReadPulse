@@ -1,0 +1,159 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}Community Books – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Community Books</div>
+    <div class="topbar-subtitle">Books shared by readers — browse &amp; borrow in person</div>
+  </div>
+  <button class="btn-primary" id="open-add-modal">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+    </svg>
+    Add a Book
+  </button>
+</div>
+
+<div class="page-content">
+  <!-- Search bar -->
+  <div class="community-search-bar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+    </svg>
+    <input type="text" id="community-search" placeholder="Search by title, author, or location…" autocomplete="off">
+  </div>
+
+  <!-- Stats -->
+  <div class="community-stats" id="community-stats"></div>
+
+  <!-- Grid -->
+  <div id="community-area">
+    <div class="community-grid" id="community-grid"></div>
+    <div class="status-msg" id="community-empty" style="display:none">
+      <span class="status-icon">📚</span>
+      <p>No community books yet.</p>
+      <p class="status-hint">Be the first to <button class="link-btn" id="empty-add-btn">add a book</button> for others to borrow!</p>
+    </div>
+    <div class="status-msg" id="community-loading">
+      <span class="status-icon" style="font-size:1.5rem">⏳</span>
+      <p>Loading books…</p>
+    </div>
+  </div>
+</div>
+
+<!-- ── Add Book Modal ── -->
+<div class="modal-overlay" id="add-modal" style="display:none">
+  <div class="modal" id="add-modal-box">
+    <div class="modal-header">
+      <div class="modal-title">List a Book</div>
+      <button class="modal-close" id="close-add-modal" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Step 1: Pick from Google Books or enter manually -->
+    <div id="step-pick" class="modal-step">
+      <p class="modal-hint">Search Google Books to auto-fill details, or enter manually.</p>
+      <div class="modal-search-wrap">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
+        <input type="text" id="modal-book-search" placeholder="Search for the book title…" autocomplete="off">
+        <button class="btn-sm" id="modal-search-btn">Search</button>
+      </div>
+      <div id="modal-search-results" class="modal-search-results"></div>
+      <div class="modal-divider"><span>or</span></div>
+      <button class="btn-outline w-full" id="btn-manual">Enter Details Manually</button>
+    </div>
+
+    <!-- Step 2: Fill in the form -->
+    <div id="step-form" class="modal-step" style="display:none">
+      <form id="add-book-form" novalidate>
+        <input type="hidden" id="f-thumbnail">
+        <input type="hidden" id="f-google-books-id">
+        <input type="hidden" id="f-published-date">
+        <input type="hidden" id="f-categories">
+
+        <div class="form-selected-book" id="form-selected-book" style="display:none">
+          <img id="form-selected-thumb" src="" alt="" style="display:none">
+          <div>
+            <div id="form-selected-title" class="form-sel-title"></div>
+            <div id="form-selected-authors" class="form-sel-authors"></div>
+          </div>
+        </div>
+
+        <!-- Cover upload -->
+        <div class="form-row">
+          <label class="form-label">Book Cover <small>(optional)</small></label>
+          <div class="cover-upload-wrap">
+            <div class="cover-upload-preview" id="cover-preview" style="display:none">
+              <img id="cover-preview-img" src="" alt="Cover preview">
+              <button type="button" class="btn-remove-cover" id="btn-remove-cover" title="Remove cover">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <label class="cover-upload-placeholder" id="cover-placeholder" for="f-cover-upload">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              <span>Upload Cover</span>
+              <small>JPG, PNG · max 5MB</small>
+            </label>
+            <input type="file" id="f-cover-upload" accept="image/*" style="display:none">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <label class="form-label">Book Title <span class="req">*</span></label>
+          <input class="form-input" type="text" id="f-title" placeholder="e.g. The Alchemist" required>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Author(s)</label>
+          <input class="form-input" type="text" id="f-authors" placeholder="e.g. Paulo Coelho">
+        </div>
+        <div class="form-row two-col">
+          <div>
+            <label class="form-label">Your Name <span class="req">*</span></label>
+            <input class="form-input" type="text" id="f-owner-name" placeholder="e.g. Maria Santos" required>
+          </div>
+          <div>
+            <label class="form-label">Condition</label>
+            <select class="form-input" id="f-condition">
+              <option value="new">New</option>
+              <option value="like_new">Like New</option>
+              <option value="good" selected>Good</option>
+              <option value="fair">Fair</option>
+              <option value="worn">Worn</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <label class="form-label">Your Contact <small>(email, phone, or social)</small></label>
+          <input class="form-input" type="text" id="f-owner-contact" placeholder="e.g. maria@email.com or @mariareads">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Location <small>(barangay/city for meetup)</small></label>
+          <input class="form-input" type="text" id="f-location" placeholder="e.g. Brgy. San Antonio, Quezon City">
+        </div>
+        <div class="form-row">
+          <label class="form-label">Notes <small>(optional)</small></label>
+          <textarea class="form-input" id="f-notes" rows="2" placeholder="Any extra info — e.g. 'Pickup available on weekends'"></textarea>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-outline" id="btn-back-to-pick">← Back</button>
+          <button type="submit" class="btn-primary" id="btn-submit-book">List Book</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}

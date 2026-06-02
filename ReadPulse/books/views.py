@@ -331,3 +331,182 @@ def api_favorite_detail(request, google_books_id):
         return JsonResponse({'is_favorite': True, 'book': book.to_dict()})
     except FavoriteBook.DoesNotExist:
         return JsonResponse({'is_favorite': False})
+
+
+# ─────────────────────────────────────────────
+# Community Books – Page views
+# ─────────────────────────────────────────────
+
+from .models import CommunityBook, BorrowRequest
+
+
+def community_page(request):
+    """Render the Community Books listing page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/community.html', {'fav_count': fav_count})
+
+
+def community_book_detail_page(request, book_id):
+    """Render a single community book's detail page."""
+    book = get_object_or_404(CommunityBook, id=book_id)
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/community_detail.html', {
+        'book': book,
+        'fav_count': fav_count,
+    })
+
+
+# ─────────────────────────────────────────────
+# Community Books – API
+# ─────────────────────────────────────────────
+
+@require_http_methods(["GET"])
+def api_list_community_books(request):
+    """GET /api/community/ – list all community books."""
+    q = request.GET.get('q', '').strip()
+    qs = CommunityBook.objects.all()
+    if q:
+        from django.db.models import Q
+        qs = qs.filter(Q(title__icontains=q) | Q(authors__icontains=q) | Q(location__icontains=q))
+    books = [b.to_dict() for b in qs]
+    return JsonResponse({'books': books, 'total': len(books)})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_add_community_book(request):
+    """POST /api/community/add/ – list a new community book."""
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    required = ['title', 'owner_name']
+    for field in required:
+        if not payload.get(field, '').strip():
+            return JsonResponse({'error': f'"{field}" is required.'}, status=400)
+
+    book = CommunityBook.objects.create(
+        title=payload['title'].strip(),
+        authors=payload.get('authors', '').strip(),
+        description=payload.get('description', '').strip(),
+        thumbnail=payload.get('thumbnail', '').strip(),
+        published_date=payload.get('published_date', '').strip(),
+        categories=payload.get('categories', '').strip(),
+        google_books_id=payload.get('google_books_id', '').strip(),
+        owner_name=payload['owner_name'].strip(),
+        owner_contact=payload.get('owner_contact', '').strip(),
+        location=payload.get('location', '').strip(),
+        condition=payload.get('condition', 'good'),
+        notes=payload.get('notes', '').strip(),
+    )
+    return JsonResponse({'message': 'Book listed successfully!', 'book': book.to_dict()}, status=201)
+
+
+@require_http_methods(["GET"])
+def api_community_book_detail(request, book_id):
+    """GET /api/community/<id>/ – fetch a single community book with its requests."""
+    book = get_object_or_404(CommunityBook, id=book_id)
+    data = book.to_dict()
+    data['borrow_requests'] = [r.to_dict() for r in book.borrow_requests.all()]
+    return JsonResponse({'book': data})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_request_borrow(request, book_id):
+    """POST /api/community/<id>/borrow/ – submit a borrow request."""
+    book = get_object_or_404(CommunityBook, id=book_id)
+
+    if not book.is_available:
+        return JsonResponse({'error': 'This book is not available for borrowing right now.'}, status=400)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    required = ['requester_name', 'requester_contact']
+    for field in required:
+        if not payload.get(field, '').strip():
+            return JsonResponse({'error': f'"{field}" is required.'}, status=400)
+
+    borrow = BorrowRequest.objects.create(
+        book=book,
+        requester_name=payload['requester_name'].strip(),
+        requester_contact=payload['requester_contact'].strip(),
+        message=payload.get('message', '').strip(),
+    )
+    return JsonResponse({'message': 'Borrow request submitted!', 'request': borrow.to_dict()}, status=201)
+
+
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def api_update_borrow_status(request, request_id):
+    """PATCH /api/community/requests/<id>/status/ – update borrow request status."""
+    borrow = get_object_or_404(BorrowRequest, id=request_id)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    new_status = payload.get('status', '').strip()
+    valid = [s[0] for s in BorrowRequest.STATUS_CHOICES]
+    if new_status not in valid:
+        return JsonResponse({'error': f'Invalid status. Choose from: {", ".join(valid)}'}, status=400)
+
+    borrow.status = new_status
+    borrow.save()
+
+    # Mark book unavailable when approved, available again when returned/declined
+    if new_status == 'approved':
+        borrow.book.is_available = False
+        borrow.book.save()
+    elif new_status in ('returned', 'declined'):
+        borrow.book.is_available = True
+        borrow.book.save()
+
+    return JsonResponse({'message': 'Status updated.', 'request': borrow.to_dict()})
+
+
+def my_books_page(request):
+    """Render the My Books page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/my_books.html', {'fav_count': fav_count})
+
+
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def api_update_community_book(request, book_id):
+    """PATCH /api/community/<id>/update/ – update a community book's details."""
+    book = get_object_or_404(CommunityBook, id=book_id)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    updatable = ['title', 'authors', 'description', 'condition', 'notes',
+                 'location', 'owner_contact', 'is_available']
+    for field in updatable:
+        if field in payload:
+            val = payload[field]
+            if isinstance(val, str):
+                val = val.strip()
+            setattr(book, field, val)
+
+    if not book.title:
+        return JsonResponse({'error': '"title" cannot be empty.'}, status=400)
+
+    book.save()
+    return JsonResponse({'message': 'Book updated successfully!', 'book': book.to_dict()})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_delete_community_book(request, book_id):
+    """DELETE /api/community/<id>/delete/ – remove a community book listing."""
+    book = get_object_or_404(CommunityBook, id=book_id)
+    book.delete()
+    return JsonResponse({'message': 'Book listing deleted.'}, status=200)

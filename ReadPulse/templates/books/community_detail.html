@@ -1,0 +1,264 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}{{ book.title }} – Community – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <a href="/community/" class="btn-back">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+    Community Books
+  </a>
+</div>
+
+<div class="page-content">
+  <div class="detail-layout">
+
+    <!-- LEFT: Book info -->
+    <div class="detail-left">
+      <div class="detail-cover">
+        {% if book.thumbnail %}
+        <img src="{{ book.thumbnail }}" alt="{{ book.title }}"
+             onerror="this.parentElement.innerHTML='<div class=\'book-cover-placeholder large\'><svg width=\'48\' height=\'48\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><path d=\'M4 19.5A2.5 2.5 0 0 1 6.5 17H20\'/><path d=\'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\'/></svg><span>No Cover</span></div>'">
+        {% else %}
+        <div class="book-cover-placeholder large">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+          </svg>
+          <span>No Cover</span>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="detail-meta-list">
+        {% if book.condition %}
+        <div class="detail-meta-item">
+          <span class="meta-label">Condition</span>
+          <span class="condition-badge condition-{{ book.condition }}">{{ book.get_condition_display }}</span>
+        </div>
+        {% endif %}
+        {% if book.published_date %}
+        <div class="detail-meta-item">
+          <span class="meta-label">Published</span>
+          <span>{{ book.published_date|slice:":4" }}</span>
+        </div>
+        {% endif %}
+        {% if book.categories %}
+        <div class="detail-meta-item">
+          <span class="meta-label">Genre</span>
+          <span>{{ book.categories }}</span>
+        </div>
+        {% endif %}
+        <div class="detail-meta-item">
+          <span class="meta-label">Status</span>
+          {% if book.is_available %}
+          <span class="availability-badge available">Available</span>
+          {% else %}
+          <span class="availability-badge unavailable">Currently Borrowed</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Details + borrow -->
+    <div class="detail-right">
+      <div class="detail-title">{{ book.title }}</div>
+      {% if book.authors %}
+      <div class="detail-author">{{ book.authors }}</div>
+      {% endif %}
+
+      {% if book.description %}
+      <div class="detail-description">{{ book.description|truncatewords:80 }}</div>
+      {% endif %}
+
+      <!-- Owner card -->
+      <div class="owner-card">
+        <div class="owner-avatar">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+            <circle cx="12" cy="7" r="4"/>
+          </svg>
+        </div>
+        <div class="owner-info">
+          <div class="owner-label">Listed by</div>
+          <div class="owner-name">{{ book.owner_name }}</div>
+          {% if book.location %}
+          <div class="owner-location">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/>
+              <circle cx="12" cy="10" r="3"/>
+            </svg>
+            {{ book.location }}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {% if book.notes %}
+      <div class="book-notes">
+        <div class="notes-label">Owner's Notes</div>
+        <p>{{ book.notes }}</p>
+      </div>
+      {% endif %}
+
+      <!-- Borrow CTA -->
+      {% if book.is_available %}
+      <button class="btn-primary btn-borrow" id="open-borrow-modal">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+          <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        </svg>
+        Request to Borrow
+      </button>
+      {% else %}
+      <div class="borrow-unavailable">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        This book is currently borrowed. Check back later!
+      </div>
+      {% endif %}
+
+      <!-- Owner Actions (only shown when this browser listed the book) -->
+      <div class="owner-actions-bar" id="owner-actions" style="display:none">
+        <div class="owner-actions-label">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2a5 5 0 1 0 0 10A5 5 0 0 0 12 2z"/><path d="M2 21a10 10 0 0 1 20 0"/>
+          </svg>
+          You listed this book
+        </div>
+        <div class="owner-actions-btns">
+          <button class="btn-outline btn-sm" id="open-edit-modal">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit Listing
+          </button>
+          <button class="btn-danger btn-sm" id="delete-book-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+              <path d="M10 11v6"/><path d="M14 11v6"/>
+            </svg>
+            Delete Listing
+          </button>
+        </div>
+      </div>
+
+      <!-- Existing borrow requests (for the owner to see) -->
+      <div class="borrow-requests-section" id="borrow-requests-section" style="display:none">
+        <div class="section-label">Borrow Requests</div>
+        <div id="borrow-requests-list"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── Borrow Request Modal ── -->
+<div class="modal-overlay" id="borrow-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Request to Borrow</div>
+      <button class="modal-close" id="close-borrow-modal" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="borrow-book-preview">
+      {% if book.thumbnail %}<img src="{{ book.thumbnail }}" alt="" class="borrow-preview-thumb">{% endif %}
+      <div>
+        <div class="borrow-preview-title">{{ book.title }}</div>
+        <div class="borrow-preview-owner">Owned by {{ book.owner_name }}</div>
+      </div>
+    </div>
+
+    <form id="borrow-form" novalidate style="padding: 20px 24px 24px;">
+      <div class="form-row">
+        <label class="form-label">Your Name <span class="req">*</span></label>
+        <input class="form-input" type="text" id="b-name" placeholder="e.g. Juan dela Cruz" required>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Your Contact <span class="req">*</span> <small>(email, phone, or social)</small></label>
+        <input class="form-input" type="text" id="b-contact" placeholder="e.g. juan@email.com or 09xx-xxx-xxxx" required>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Message to Owner <small>(optional)</small></label>
+        <textarea class="form-input" id="b-message" rows="3" placeholder="Introduce yourself or propose a meetup…"></textarea>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-outline" id="cancel-borrow">Cancel</button>
+        <button type="submit" class="btn-primary">Send Request</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  window.COMMUNITY_BOOK_ID = {{ book.id }};
+</script>
+
+<!-- ── Edit Listing Modal ── -->
+<div class="modal-overlay" id="edit-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit Book Listing</div>
+      <button class="modal-close" id="close-edit-modal" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="borrow-book-preview">
+      {% if book.thumbnail %}<img src="{{ book.thumbnail }}" alt="" class="borrow-preview-thumb">{% endif %}
+      <div>
+        <div class="borrow-preview-title">{{ book.title }}</div>
+        <div class="borrow-preview-owner">Listed by {{ book.owner_name }}</div>
+      </div>
+    </div>
+
+    <form id="edit-form" novalidate style="padding: 20px 24px 24px;">
+      <div class="form-row">
+        <label class="form-label">Condition</label>
+        <select class="form-input" id="e-condition">
+          <option value="new" {% if book.condition == 'new' %}selected{% endif %}>New</option>
+          <option value="like_new" {% if book.condition == 'like_new' %}selected{% endif %}>Like New</option>
+          <option value="good" {% if book.condition == 'good' %}selected{% endif %}>Good</option>
+          <option value="fair" {% if book.condition == 'fair' %}selected{% endif %}>Fair</option>
+          <option value="worn" {% if book.condition == 'worn' %}selected{% endif %}>Worn</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Your Location <small>(where to meet)</small></label>
+        <input class="form-input" type="text" id="e-location" value="{{ book.location }}" placeholder="e.g. Makati, Metro Manila">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Contact Info</label>
+        <input class="form-input" type="text" id="e-owner-contact" value="{{ book.owner_contact }}" placeholder="e.g. your email or phone">
+      </div>
+      <div class="form-row">
+        <label class="form-label">Notes</label>
+        <textarea class="form-input" id="e-notes" rows="3" placeholder="Any extra info for borrowers…">{{ book.notes }}</textarea>
+      </div>
+      <div class="form-row form-row-inline">
+        <label class="form-label">Available to borrow</label>
+        <input type="checkbox" id="e-available" {% if book.is_available %}checked{% endif %} class="form-checkbox">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-outline" id="cancel-edit">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/community.js' %}"></script>
+{% endblock %}

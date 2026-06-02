@@ -41,6 +41,27 @@
       <span class="fav-badge">{{ fav_count }}</span>
       {% endif %}
     </a>
+
+    <a href="/community/" class="nav-item {% if request.resolver_match.url_name == 'community' or request.resolver_match.url_name == 'community_book_detail' %}active{% endif %}">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Community Books
+    </a>
+
+    <a href="/my-books/" class="nav-item {% if request.resolver_match.url_name == 'my_books' %}active{% endif %}" id="nav-my-books">
+      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+        <line x1="12" y1="8" x2="12" y2="14"/>
+        <line x1="9" y1="11" x2="15" y2="11"/>
+      </svg>
+      My Listed Books
+      <span class="my-books-badge" id="my-books-badge" style="display:none"></span>
+    </a>
   </nav>
 
   <div class="sidebar-footer">
@@ -55,6 +76,20 @@
 
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
+
+<script>
+(function() {
+  // Show My Books badge count from localStorage
+  try {
+    var ids = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
+    var badge = document.getElementById('my-books-badge');
+    if (badge && ids.length > 0) {
+      badge.textContent = ids.length;
+      badge.style.display = '';
+    }
+  } catch(e) {}
+})();
+</script>
 
 {% block scripts %}{% endblock %}
 </body>
