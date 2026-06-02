@@ -5,6 +5,7 @@ import urllib.error
 
 from django.conf import settings
 from django.shortcuts import render, get_object_or_404
+from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
@@ -16,12 +17,14 @@ from .models import FavoriteBook
 # Page views
 # ─────────────────────────────────────────────
 
+@login_required
 def search_page(request):
     """Render the Search Books page."""
     fav_count = FavoriteBook.objects.count()
     return render(request, 'books/search.html', {'fav_count': fav_count})
 
 
+@login_required
 def book_detail_page(request, google_books_id):
     """Render the Book Detail page."""
     fav_count = FavoriteBook.objects.count()
@@ -31,6 +34,7 @@ def book_detail_page(request, google_books_id):
     })
 
 
+@login_required
 def favorites_page(request):
     """Render the Favorites page."""
     favorites = FavoriteBook.objects.all()
@@ -340,12 +344,14 @@ def api_favorite_detail(request, google_books_id):
 from .models import CommunityBook, BorrowRequest
 
 
+@login_required
 def community_page(request):
     """Render the Community Books listing page."""
     fav_count = FavoriteBook.objects.count()
     return render(request, 'books/community.html', {'fav_count': fav_count})
 
 
+@login_required
 def community_book_detail_page(request, book_id):
     """Render a single community book's detail page."""
     book = get_object_or_404(CommunityBook, id=book_id)
@@ -507,18 +513,21 @@ def api_update_borrow_status(request, request_id):
     return JsonResponse({'message': 'Status updated.', 'request': borrow.to_dict()})
 
 
+@login_required
 def my_books_page(request):
     """Render the My Books page."""
     fav_count = FavoriteBook.objects.count()
     return render(request, 'books/my_books.html', {'fav_count': fav_count})
 
 
+@login_required
 def my_requests_page(request):
     """Render the My Requests page."""
     fav_count = FavoriteBook.objects.count()
     return render(request, 'books/my_requests.html', {'fav_count': fav_count})
 
 
+@login_required
 def requests_page(request):
     """Render the All Requests page."""
     fav_count = FavoriteBook.objects.count()
