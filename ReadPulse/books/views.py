@@ -399,6 +399,7 @@ def api_add_community_book(request):
         location=payload.get('location', '').strip(),
         condition=payload.get('condition', 'good'),
         notes=payload.get('notes', '').strip(),
+        listing_type=payload.get('listing_type', 'borrow'),
     )
     return JsonResponse({'message': 'Book listed successfully!', 'book': book.to_dict()}, status=201)
 
@@ -436,6 +437,7 @@ def api_request_borrow(request, book_id):
         requester_name=payload['requester_name'].strip(),
         requester_contact=payload['requester_contact'].strip(),
         message=payload.get('message', '').strip(),
+        request_type=payload.get('request_type', 'borrow'),
     )
     return JsonResponse({'message': 'Borrow request submitted!', 'request': borrow.to_dict()}, status=201)
 
@@ -476,6 +478,12 @@ def my_books_page(request):
     return render(request, 'books/my_books.html', {'fav_count': fav_count})
 
 
+def requests_page(request):
+    """Render the All Requests page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/requests.html', {'fav_count': fav_count})
+
+
 @csrf_exempt
 @require_http_methods(["PATCH"])
 def api_update_community_book(request, book_id):
@@ -510,3 +518,18 @@ def api_delete_community_book(request, book_id):
     book = get_object_or_404(CommunityBook, id=book_id)
     book.delete()
     return JsonResponse({'message': 'Book listing deleted.'}, status=200)
+
+
+@require_http_methods(["GET"])
+def api_list_all_requests(request):
+    """GET /api/community/all-requests/ – list all borrow/swap requests with optional filters."""
+    status_filter = request.GET.get('status', '').strip()
+    type_filter   = request.GET.get('type', '').strip()
+
+    qs = BorrowRequest.objects.select_related('book').all()
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+    if type_filter:
+        qs = qs.filter(request_type=type_filter)
+
+    return JsonResponse({'requests': [r.to_dict() for r in qs], 'total': qs.count()})

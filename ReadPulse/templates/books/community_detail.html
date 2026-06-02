@@ -40,6 +40,19 @@
           <span class="condition-badge condition-{{ book.condition }}">{{ book.get_condition_display }}</span>
         </div>
         {% endif %}
+        <div class="detail-meta-item">
+          <span class="meta-label">Available For</span>
+          <span class="listing-type-badge listing-type-{{ book.listing_type }}">
+            {% if book.listing_type == 'swap' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+            {% elif book.listing_type == 'both' %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            {% else %}
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+            {% endif %}
+            {{ book.get_listing_type_display }}
+          </span>
+        </div>
         {% if book.published_date %}
         <div class="detail-meta-item">
           <span class="meta-label">Published</span>
@@ -65,7 +78,22 @@
 
     <!-- RIGHT: Details + borrow -->
     <div class="detail-right">
-      <div class="detail-title">{{ book.title }}</div>
+      <div class="detail-title-row">
+        <div class="detail-title">{{ book.title }}</div>
+        {% if book.google_books_id %}
+        <button class="comm-fav-btn" id="comm-fav-btn" aria-label="Add to favorites" data-active="0"
+                data-google-books-id="{{ book.google_books_id }}"
+                data-title="{{ book.title }}"
+                data-authors="{{ book.authors }}"
+                data-thumbnail="{{ book.thumbnail }}"
+                data-published-date="{{ book.published_date }}"
+                data-categories="{{ book.categories }}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+        </button>
+        {% endif %}
+      </div>
       {% if book.authors %}
       <div class="detail-author">{{ book.authors }}</div>
       {% endif %}
@@ -104,14 +132,15 @@
       </div>
       {% endif %}
 
-      <!-- Borrow CTA -->
+      <!-- Borrow/Swap CTA (hidden for the owner via JS) -->
+      <div id="borrow-cta">
       {% if book.is_available %}
       <button class="btn-primary btn-borrow" id="open-borrow-modal">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
           <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
         </svg>
-        Request to Borrow
+        {% if book.listing_type == 'swap' %}Request to Swap{% elif book.listing_type == 'both' %}Request to Borrow / Swap{% else %}Request to Borrow{% endif %}
       </button>
       {% else %}
       <div class="borrow-unavailable">
@@ -121,6 +150,7 @@
         This book is currently borrowed. Check back later!
       </div>
       {% endif %}
+      </div>
 
       <!-- Owner Actions (only shown when this browser listed the book) -->
       <div class="owner-actions-bar" id="owner-actions" style="display:none">
@@ -161,7 +191,7 @@
 <div class="modal-overlay" id="borrow-modal" style="display:none">
   <div class="modal">
     <div class="modal-header">
-      <div class="modal-title">Request to Borrow</div>
+      <div class="modal-title">{% if book.listing_type == 'swap' %}Request to Swap{% elif book.listing_type == 'both' %}Request to Borrow / Swap{% else %}Request to Borrow{% endif %}</div>
       <button class="modal-close" id="close-borrow-modal" aria-label="Close">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
@@ -178,6 +208,29 @@
     </div>
 
     <form id="borrow-form" novalidate style="padding: 20px 24px 24px;">
+      {% if book.listing_type == 'both' %}
+      <div class="form-row">
+        <label class="form-label">Request Type <span class="req">*</span></label>
+        <div class="listing-type-group">
+          <label class="listing-type-option">
+            <input type="radio" name="b-request-type" value="borrow" checked>
+            <span class="listing-type-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Borrow
+            </span>
+          </label>
+          <label class="listing-type-option">
+            <input type="radio" name="b-request-type" value="swap">
+            <span class="listing-type-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              Swap
+            </span>
+          </label>
+        </div>
+      </div>
+      {% else %}
+      <input type="hidden" name="b-request-type" value="{{ book.listing_type }}">
+      {% endif %}
       <div class="form-row">
         <label class="form-label">Your Name <span class="req">*</span></label>
         <input class="form-input" type="text" id="b-name" placeholder="e.g. Juan dela Cruz" required>
@@ -200,6 +253,75 @@
 
 <script>
   window.COMMUNITY_BOOK_ID = {{ book.id }};
+</script>
+
+<script>
+// ── Community book favourite button ──
+(function () {
+  const btn = document.getElementById('comm-fav-btn');
+  if (!btn) return;
+
+  const googleBooksId = btn.dataset.googleBooksId;
+
+  function setActive(active) {
+    btn.dataset.active = active ? '1' : '0';
+    btn.classList.toggle('active', active);
+  }
+
+  function updateBadge(delta) {
+    const badge = document.querySelector('.fav-badge');
+    if (!badge) return;
+    const current = parseInt(badge.textContent, 10) || 0;
+    const next = current + delta;
+    badge.textContent = next;
+    badge.style.display = next > 0 ? '' : 'none';
+  }
+
+  function toast(msg, type) {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = `toast toast-${type || 'success'}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('toast-visible'), 10);
+    setTimeout(() => { t.classList.remove('toast-visible'); setTimeout(() => t.remove(), 300); }, 3200);
+  }
+
+  // Check current favorite state
+  fetch(`/api/favorites/${encodeURIComponent(googleBooksId)}/`)
+    .then(r => r.json())
+    .then(d => setActive(d.is_favorite))
+    .catch(() => {});
+
+  btn.addEventListener('click', async () => {
+    const isActive = btn.dataset.active === '1';
+    btn.disabled = true;
+    try {
+      if (isActive) {
+        const res = await fetch(`/api/favorites/${encodeURIComponent(googleBooksId)}/remove/`, { method: 'DELETE' });
+        if (res.ok) { setActive(false); updateBadge(-1); toast('Removed from favorites.'); }
+        else toast('Failed to remove.', 'error');
+      } else {
+        const res = await fetch('/api/favorites/add/', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            google_books_id: googleBooksId,
+            title:           btn.dataset.title,
+            authors:         btn.dataset.authors,
+            thumbnail:       btn.dataset.thumbnail,
+            published_date:  btn.dataset.publishedDate,
+            categories:      btn.dataset.categories,
+          }),
+        });
+        if (res.ok) { setActive(true); updateBadge(1); toast('Saved to favorites! ❤️'); }
+        else toast('Failed to save.', 'error');
+      }
+    } catch { toast('Network error.', 'error'); }
+    finally { btn.disabled = false; }
+  });
+})();
 </script>
 
 <!-- ── Edit Listing Modal ── -->

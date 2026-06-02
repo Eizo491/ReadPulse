@@ -32,4 +32,8 @@ urlpatterns = [
 
     # ── My Books page ──
     path('my-books/', views.my_books_page, name='my_books'),
+
+    # ── Requests page ──
+    path('requests/', views.requests_page, name='requests'),
+    path('api/community/all-requests/', views.api_list_all_requests, name='api_all_requests'),
 ]

@@ -6,12 +6,33 @@ class FavoriteBook(models.Model):
     title = models.CharField(max_length=500)
     authors = models.CharField(max_length=500, blank=True, default='')
     description = models.TextField(blank=True, default='')
-    thumbnail = models.URLField(max_length=1000, blank=True, default='')
+    thumbnail = models.TextField(blank=True, default='')
     published_date = models.CharField(max_length=50, blank=True, default='')
     page_count = models.IntegerField(null=True, blank=True)
     categories = models.CharField(max_length=500, blank=True, default='')
     average_rating = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return self.title
+
+    def to_dict(self):
+        return {
+            'google_books_id': self.google_books_id,
+            'title': self.title,
+            'authors': self.authors,
+            'description': self.description,
+            'thumbnail': self.thumbnail,
+            'published_date': self.published_date,
+            'page_count': self.page_count,
+            'categories': self.categories,
+            'average_rating': self.average_rating,
+            'created_at': self.created_at.isoformat(),
+            'is_favorite': True,
+        }
 
 class CommunityBook(models.Model):
 
@@ -21,6 +42,12 @@ class CommunityBook(models.Model):
         ('good', 'Good'),
         ('fair', 'Fair'),
         ('worn', 'Worn'),
+    ]
+
+    LISTING_TYPE_CHOICES = [
+        ('borrow', 'Borrow'),
+        ('swap', 'Swap'),
+        ('both', 'Borrow or Swap'),
     ]
 
     title = models.CharField(max_length=500)
@@ -37,6 +64,7 @@ class CommunityBook(models.Model):
     condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='good')
     notes = models.TextField(blank=True, default='')
 
+    listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='borrow')
     is_available = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -61,6 +89,8 @@ class CommunityBook(models.Model):
             'location': self.location,
             'condition': self.condition,
             'condition_display': self.get_condition_display(),
+            'listing_type': self.listing_type,
+            'listing_type_display': self.get_listing_type_display(),
             'notes': self.notes,
             'is_available': self.is_available,
             'created_at': self.created_at.isoformat(),
@@ -76,10 +106,16 @@ class BorrowRequest(models.Model):
         ('returned', 'Returned'),
     ]
 
+    REQUEST_TYPE_CHOICES = [
+        ('borrow', 'Borrow'),
+        ('swap', 'Swap'),
+    ]
+
     book = models.ForeignKey(CommunityBook, on_delete=models.CASCADE, related_name='borrow_requests')
     requester_name = models.CharField(max_length=200)
     requester_contact = models.CharField(max_length=300)
     message = models.TextField(blank=True, default='')
+    request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES, default='borrow')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -99,6 +135,8 @@ class BorrowRequest(models.Model):
             'requester_name': self.requester_name,
             'requester_contact': self.requester_contact,
             'message': self.message,
+            'request_type': self.request_type,
+            'request_type_display': self.get_request_type_display(),
             'status': self.status,
             'status_display': self.get_status_display(),
             'created_at': self.created_at.isoformat(),

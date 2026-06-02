@@ -62,10 +62,16 @@
         const chip = book.is_available
           ? '<span class="availability-chip available">Available</span>'
           : '<span class="availability-chip unavailable">Borrowed</span>';
+        const listingChip = book.listing_type === 'swap'
+          ? '<span class="listing-type-chip listing-type-swap">Swap</span>'
+          : book.listing_type === 'both'
+          ? '<span class="listing-type-chip listing-type-both">Borrow/Swap</span>'
+          : '<span class="listing-type-chip listing-type-borrow">Borrow</span>';
         card.innerHTML = `
           <div class="community-card-cover">
             ${coverHTML(book)}
             ${chip}
+            ${listingChip}
           </div>
           <div class="community-card-body">
             <div class="community-card-title">${book.title}</div>
@@ -315,6 +321,7 @@
           google_books_id: document.getElementById('f-google-books-id').value.trim(),
           published_date: document.getElementById('f-published-date').value.trim(),
           categories:     document.getElementById('f-categories').value.trim(),
+          listing_type:   (document.querySelector('input[name="f-listing-type"]:checked') || {}).value || 'borrow',
         };
 
         try {
@@ -462,6 +469,8 @@
         if (!name)    { toast('Your name is required.', 'error'); return; }
         if (!contact) { toast('Your contact info is required.', 'error'); return; }
 
+        const requestType = (document.querySelector('input[name="b-request-type"]:checked') || {}).value || 'borrow';
+
         const submitBtn = borrowForm.querySelector('[type=submit]');
         submitBtn.disabled = true;
         submitBtn.textContent = 'Sending…';
@@ -470,7 +479,7 @@
           const res = await fetch(`/api/community/${bookId}/borrow/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requester_name: name, requester_contact: contact, message }),
+            body: JSON.stringify({ requester_name: name, requester_contact: contact, message, request_type: requestType }),
           });
           const data = await res.json();
           if (!res.ok) throw new Error(data.error || 'Failed to send request.');
@@ -492,6 +501,8 @@
       if (myBooks.includes(bookId)) {
         const ownerActions = document.getElementById('owner-actions');
         if (ownerActions) ownerActions.style.display = '';
+        const borrowCta = document.getElementById('borrow-cta');
+        if (borrowCta) borrowCta.style.display = 'none';
       }
     } catch(e) {}
 
