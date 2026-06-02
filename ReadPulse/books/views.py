@@ -237,10 +237,8 @@ def api_search_audiobooks(request):
     audiobooks = []
 
     for ab in books_raw:
-        # Build cover: LibriVox doesn't always have covers; use their default
-        cover = ab.get('url_zip_file', '')  # placeholder, we'll use a generic approach
+        cover = ab.get('url_zip_file', '')
 
-        # Authors from the readers/authors list
         authors_list = ab.get('authors', []) or []
         author_names = ', '.join(
             f"{a.get('first_name', '')} {a.get('last_name', '')}".strip()
@@ -262,7 +260,6 @@ def api_search_audiobooks(request):
             'totaltime': ab.get('totaltime', ''),
         })
 
-    # LibriVox API doesn't return total count cleanly; estimate from response size
     total_results = len(books_raw) + offset if len(books_raw) == limit else offset + len(books_raw)
 
     return JsonResponse({
@@ -318,7 +315,10 @@ def api_add_favorite(request):
 @require_http_methods(["DELETE"])
 def api_remove_favorite(request, google_books_id):
     """DELETE /api/favorites/<google_books_id>/remove/ – remove a book from favorites."""
-    book = get_object_or_404(FavoriteBook, google_books_id=google_books_id)
+    try:
+        book = FavoriteBook.objects.get(google_books_id=google_books_id)
+    except FavoriteBook.DoesNotExist:
+        return JsonResponse({'error': 'Book not found in favorites.'}, status=404)
     book.delete()
     return JsonResponse({'message': 'Removed from favorites.'}, status=200)
 
@@ -407,7 +407,10 @@ def api_add_community_book(request):
 @require_http_methods(["GET"])
 def api_community_book_detail(request, book_id):
     """GET /api/community/<id>/ – fetch a single community book with its requests."""
-    book = get_object_or_404(CommunityBook, id=book_id)
+    try:
+        book = CommunityBook.objects.get(id=book_id)
+    except CommunityBook.DoesNotExist:
+        return JsonResponse({'error': 'Book not found.'}, status=404)
     data = book.to_dict()
     data['borrow_requests'] = [r.to_dict() for r in book.borrow_requests.all()]
     return JsonResponse({'book': data})
@@ -416,8 +419,11 @@ def api_community_book_detail(request, book_id):
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_request_borrow(request, book_id):
-    """POST /api/community/<id>/borrow/ – submit a borrow request."""
-    book = get_object_or_404(CommunityBook, id=book_id)
+    """POST /api/community/<id>/borrow/ – submit a borrow/swap request."""
+    try:
+        book = CommunityBook.objects.get(id=book_id)
+    except CommunityBook.DoesNotExist:
+        return JsonResponse({'error': 'Book not found.'}, status=404)
 
     if not book.is_available:
         return JsonResponse({'error': 'This book is not available for borrowing right now.'}, status=400)
@@ -432,21 +438,50 @@ def api_request_borrow(request, book_id):
         if not payload.get(field, '').strip():
             return JsonResponse({'error': f'"{field}" is required.'}, status=400)
 
+    # Validate that request_type matches what the listing allows
+    request_type = payload.get('request_type', 'borrow')
+    valid_types = [t[0] for t in BorrowRequest.REQUEST_TYPE_CHOICES]
+    if request_type not in valid_types:
+        return JsonResponse({'error': f'Invalid request_type. Choose from: {", ".join(valid_types)}'}, status=400)
+
+    if book.listing_type != 'both' and request_type != book.listing_type:
+        return JsonResponse(
+            {'error': f'This book is only available for "{book.listing_type}". Cannot request "{request_type}".'},
+            status=400
+        )
+
+    # Parse meetup_datetime safely — HTML datetime-local sends "YYYY-MM-DDTHH:MM"
+    # (no seconds), which Django's DateTimeField rejects. Normalise it here.
+    meetup_datetime = None
+    raw_dt = payload.get('meetup_datetime') or ''
+    if raw_dt.strip():
+        from django.utils.dateparse import parse_datetime
+        # Append seconds if missing (e.g. "2026-03-06T05:16" → "2026-03-06T05:16:00")
+        if raw_dt.count(':') == 1:
+            raw_dt = raw_dt + ':00'
+        meetup_datetime = parse_datetime(raw_dt)
+        if meetup_datetime is None:
+            return JsonResponse({'error': 'Invalid meetup_datetime format. Use YYYY-MM-DDTHH:MM.'}, status=400)
+
     borrow = BorrowRequest.objects.create(
         book=book,
         requester_name=payload['requester_name'].strip(),
         requester_contact=payload['requester_contact'].strip(),
         message=payload.get('message', '').strip(),
-        request_type=payload.get('request_type', 'borrow'),
+        meetup_datetime=meetup_datetime,
+        request_type=request_type,
     )
-    return JsonResponse({'message': 'Borrow request submitted!', 'request': borrow.to_dict()}, status=201)
+    return JsonResponse({'message': 'Request submitted!', 'request': borrow.to_dict()}, status=201)
 
 
 @csrf_exempt
 @require_http_methods(["PATCH"])
 def api_update_borrow_status(request, request_id):
     """PATCH /api/community/requests/<id>/status/ – update borrow request status."""
-    borrow = get_object_or_404(BorrowRequest, id=request_id)
+    try:
+        borrow = BorrowRequest.objects.get(id=request_id)
+    except BorrowRequest.DoesNotExist:
+        return JsonResponse({'error': 'Request not found.'}, status=404)
 
     try:
         payload = json.loads(request.body)
@@ -478,6 +513,12 @@ def my_books_page(request):
     return render(request, 'books/my_books.html', {'fav_count': fav_count})
 
 
+def my_requests_page(request):
+    """Render the My Requests page."""
+    fav_count = FavoriteBook.objects.count()
+    return render(request, 'books/my_requests.html', {'fav_count': fav_count})
+
+
 def requests_page(request):
     """Render the All Requests page."""
     fav_count = FavoriteBook.objects.count()
@@ -488,20 +529,29 @@ def requests_page(request):
 @require_http_methods(["PATCH"])
 def api_update_community_book(request, book_id):
     """PATCH /api/community/<id>/update/ – update a community book's details."""
-    book = get_object_or_404(CommunityBook, id=book_id)
+    try:
+        book = CommunityBook.objects.get(id=book_id)
+    except CommunityBook.DoesNotExist:
+        return JsonResponse({'error': 'Book not found.'}, status=404)
 
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
 
+    # listing_type added so owner can change borrow/return/both
     updatable = ['title', 'authors', 'description', 'condition', 'notes',
-                 'location', 'owner_contact', 'is_available']
+                 'location', 'owner_contact', 'is_available', 'listing_type']
     for field in updatable:
         if field in payload:
             val = payload[field]
             if isinstance(val, str):
                 val = val.strip()
+            # Validate listing_type
+            if field == 'listing_type':
+                valid_listing = [t[0] for t in CommunityBook.LISTING_TYPE_CHOICES]
+                if val not in valid_listing:
+                    return JsonResponse({'error': f'Invalid listing_type. Choose from: {", ".join(valid_listing)}'}, status=400)
             setattr(book, field, val)
 
     if not book.title:
@@ -515,9 +565,81 @@ def api_update_community_book(request, book_id):
 @require_http_methods(["DELETE"])
 def api_delete_community_book(request, book_id):
     """DELETE /api/community/<id>/delete/ – remove a community book listing."""
-    book = get_object_or_404(CommunityBook, id=book_id)
+    try:
+        book = CommunityBook.objects.get(id=book_id)
+    except CommunityBook.DoesNotExist:
+        return JsonResponse({'error': 'Book not found.'}, status=404)
     book.delete()
     return JsonResponse({'message': 'Book listing deleted.'}, status=200)
+
+
+@csrf_exempt
+@require_http_methods(["PATCH"])
+def api_edit_borrow_request(request, request_id):
+    """PATCH /api/community/requests/<id>/edit/ – requester edits their own borrow request (only if still pending)."""
+    try:
+        borrow = BorrowRequest.objects.get(id=request_id)
+    except BorrowRequest.DoesNotExist:
+        return JsonResponse({'error': 'Request not found.'}, status=404)
+
+    if borrow.status != 'pending':
+        return JsonResponse({'error': 'Only pending requests can be edited.'}, status=400)
+
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    editable = ['requester_name', 'requester_contact', 'message', 'request_type']
+    for field in editable:
+        if field in payload:
+            val = payload[field]
+            if isinstance(val, str):
+                val = val.strip()
+            setattr(borrow, field, val)
+
+    # Handle meetup_datetime separately — datetime-local sends "YYYY-MM-DDTHH:MM" (no seconds)
+    if 'meetup_datetime' in payload:
+        raw_dt = payload['meetup_datetime'] or ''
+        if not raw_dt.strip():
+            borrow.meetup_datetime = None
+        else:
+            from django.utils.dateparse import parse_datetime
+            if raw_dt.count(':') == 1:
+                raw_dt = raw_dt + ':00'
+            parsed = parse_datetime(raw_dt)
+            if parsed is None:
+                return JsonResponse({'error': 'Invalid meetup_datetime format. Use YYYY-MM-DDTHH:MM.'}, status=400)
+            borrow.meetup_datetime = parsed
+
+    borrow.save()
+    return JsonResponse({'message': 'Request updated.', 'request': borrow.to_dict()})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_cancel_borrow_request(request, request_id):
+    """DELETE /api/community/requests/<id>/cancel/ – requester cancels their own borrow request (only if still pending)."""
+    try:
+        borrow = BorrowRequest.objects.get(id=request_id)
+    except BorrowRequest.DoesNotExist:
+        return JsonResponse({'error': 'Request not found.'}, status=404)
+
+    if borrow.status != 'pending':
+        return JsonResponse({'error': 'Only pending requests can be cancelled.'}, status=400)
+
+    borrow.delete()
+    return JsonResponse({'message': 'Request cancelled.'}, status=200)
+
+
+@require_http_methods(["GET"])
+def api_get_borrow_request(request, request_id):
+    """GET /api/community/requests/<id>/ – fetch a single borrow request by ID."""
+    try:
+        borrow = BorrowRequest.objects.get(id=request_id)
+    except BorrowRequest.DoesNotExist:
+        return JsonResponse({'error': 'Request not found.'}, status=404)
+    return JsonResponse({'request': borrow.to_dict()})
 
 
 @require_http_methods(["GET"])

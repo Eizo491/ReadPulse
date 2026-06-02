@@ -115,6 +115,7 @@ class BorrowRequest(models.Model):
     requester_name = models.CharField(max_length=200)
     requester_contact = models.CharField(max_length=300)
     message = models.TextField(blank=True, default='')
+    meetup_datetime = models.DateTimeField(null=True, blank=True)
     request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES, default='borrow')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     created_at = models.DateTimeField(auto_now_add=True)
@@ -135,6 +136,7 @@ class BorrowRequest(models.Model):
             'requester_name': self.requester_name,
             'requester_contact': self.requester_contact,
             'message': self.message,
+            'meetup_datetime': self.meetup_datetime.isoformat() if self.meetup_datetime else None,
             'request_type': self.request_type,
             'request_type_display': self.get_request_type_display(),
             'status': self.status,

@@ -243,6 +243,10 @@
         <label class="form-label">Message to Owner <small>(optional)</small></label>
         <textarea class="form-input" id="b-message" rows="3" placeholder="Introduce yourself or propose a meetup…"></textarea>
       </div>
+      <div class="form-row">
+        <label class="form-label">Preferred Meetup Date &amp; Time <small>(optional)</small></label>
+        <input class="form-input" type="datetime-local" id="b-meetup-datetime">
+      </div>
       <div class="modal-actions">
         <button type="button" class="btn-outline" id="cancel-borrow">Cancel</button>
         <button type="submit" class="btn-primary">Send Request</button>
@@ -345,6 +349,32 @@
     </div>
 
     <form id="edit-form" novalidate style="padding: 20px 24px 24px;">
+      <div class="form-row">
+        <label class="form-label">Available For</label>
+        <div class="listing-type-group">
+          <label class="listing-type-option">
+            <input type="radio" name="e-listing-type" value="borrow" {% if book.listing_type == 'borrow' %}checked{% endif %}>
+            <span class="listing-type-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+              Borrow
+            </span>
+          </label>
+          <label class="listing-type-option">
+            <input type="radio" name="e-listing-type" value="swap" {% if book.listing_type == 'swap' %}checked{% endif %}>
+            <span class="listing-type-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+              Swap
+            </span>
+          </label>
+          <label class="listing-type-option">
+            <input type="radio" name="e-listing-type" value="both" {% if book.listing_type == 'both' %}checked{% endif %}>
+            <span class="listing-type-btn">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+              Both
+            </span>
+          </label>
+        </div>
+      </div>
       <div class="form-row">
         <label class="form-label">Condition</label>
         <select class="form-input" id="e-condition">

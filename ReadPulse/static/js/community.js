@@ -2,7 +2,19 @@
 (function () {
   'use strict';
 
-  // ── Helpers ──────────────────────────────────────────────────────────
+
+  // Safely parse a fetch Response as JSON — never throws a DOCTYPE error.
+  // If the server returns HTML (e.g. Django 403/404/500 page), we get a
+  // clean error message instead of "unexpected token <DOCTYPE".
+  async function safeJson(res) {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      throw new Error(`Server error (${res.status}). Please try again.`);
+    }
+  }
+
   function toast(msg, type = 'success') {
     const c = document.getElementById('toast-container');
     if (!c) return;
@@ -103,7 +115,7 @@
       try {
         const url = '/api/community/' + (q ? `?q=${encodeURIComponent(q)}` : '');
         const res = await fetch(url);
-        const data = await res.json();
+        const data = await safeJson(res);
         allBooks = data.books || [];
         renderGrid(allBooks);
       } catch (e) {
@@ -150,7 +162,7 @@
     }
 
     // ── Cover image handling ──
-    let coverDataUrl = null; // holds base64 of uploaded cover image
+    let coverDataUrl = null;
 
     function clearForm() {
       ['f-title','f-authors','f-owner-name','f-owner-contact','f-location','f-notes',
@@ -202,7 +214,6 @@
         const reader = new FileReader();
         reader.onload = e => {
           coverDataUrl = e.target.result;
-          // Clear URL-based thumbnail since we now have a file
           const thumbInput = document.getElementById('f-thumbnail');
           if (thumbInput) thumbInput.value = '';
           setCoverPreview(coverDataUrl);
@@ -241,7 +252,7 @@
       modalResults.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:0.82rem;">Searching…</div>';
       try {
         const res = await fetch(`/api/search/?q=${encodeURIComponent(q)}&max_results=8`);
-        const data = await res.json();
+        const data = await safeJson(res);
         if (!data.books || !data.books.length) {
           modalResults.innerHTML = '<div style="padding:8px;color:var(--text-muted);font-size:0.82rem;">No results found.</div>';
           return;
@@ -283,7 +294,6 @@
       else thumb.style.display = 'none';
       sel.style.display = '';
 
-      // Show book's thumbnail in cover preview if no upload yet
       if (!coverDataUrl && book.thumbnail) {
         setCoverPreview(book.thumbnail);
       }
@@ -306,22 +316,21 @@
         btn.disabled = true;
         btn.textContent = 'Listing…';
 
-        // Use uploaded cover (base64) if available, otherwise URL from Google Books
         const thumbnailValue = coverDataUrl || document.getElementById('f-thumbnail').value.trim();
 
         const payload = {
           title,
-          authors:        document.getElementById('f-authors').value.trim(),
-          owner_name:     ownerName,
-          owner_contact:  document.getElementById('f-owner-contact').value.trim(),
-          location:       document.getElementById('f-location').value.trim(),
-          condition:      document.getElementById('f-condition').value,
-          notes:          document.getElementById('f-notes').value.trim(),
-          thumbnail:      thumbnailValue,
+          authors:         document.getElementById('f-authors').value.trim(),
+          owner_name:      ownerName,
+          owner_contact:   document.getElementById('f-owner-contact').value.trim(),
+          location:        document.getElementById('f-location').value.trim(),
+          condition:       document.getElementById('f-condition').value,
+          notes:           document.getElementById('f-notes').value.trim(),
+          thumbnail:       thumbnailValue,
           google_books_id: document.getElementById('f-google-books-id').value.trim(),
-          published_date: document.getElementById('f-published-date').value.trim(),
-          categories:     document.getElementById('f-categories').value.trim(),
-          listing_type:   (document.querySelector('input[name="f-listing-type"]:checked') || {}).value || 'borrow',
+          published_date:  document.getElementById('f-published-date').value.trim(),
+          categories:      document.getElementById('f-categories').value.trim(),
+          listing_type:    (document.querySelector('input[name="f-listing-type"]:checked') || {}).value || 'borrow',
         };
 
         try {
@@ -330,16 +339,14 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!res.ok) throw new Error(data.error || 'Failed to list book.');
 
-          // Remember this book as owned by this browser session
           try {
             const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
             if (!myBooks.includes(data.book.id)) {
               myBooks.push(data.book.id);
               localStorage.setItem('readpulse_my_books', JSON.stringify(myBooks));
-              // Update sidebar badge
               const badge = document.getElementById('my-books-badge');
               if (badge) { badge.textContent = myBooks.length; badge.style.display = ''; }
             }
@@ -368,13 +375,22 @@
     async function loadRequests() {
       try {
         const res = await fetch(`/api/community/${bookId}/`);
-        const data = await res.json();
+        const data = await safeJson(res);
         const requests = (data.book || {}).borrow_requests || [];
         if (!requests.length) return;
 
         const section = document.getElementById('borrow-requests-section');
         const list = document.getElementById('borrow-requests-list');
         if (!section || !list) return;
+
+        // Only show borrow requests panel if the current user is the book owner
+        let isOwner = false;
+        try {
+          const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
+          isOwner = myBooks.includes(bookId);
+        } catch(e) {}
+
+        if (!isOwner) return;  // Visitors / requesters cannot see or action requests
 
         section.style.display = '';
         list.innerHTML = '';
@@ -415,7 +431,6 @@
           const action = btn.dataset.action;
           btn.disabled = true;
 
-          const actionLabel = action === 'returned' ? 'marking as returned' : action;
           const origText = btn.textContent;
           btn.textContent = action === 'returned' ? 'Updating…' : origText;
 
@@ -425,7 +440,7 @@
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({ status: action }),
             });
-            const data = await res.json();
+            const data = await safeJson(res);
             if (!res.ok) throw new Error(data.error || 'Update failed.');
 
             const msgs = {
@@ -465,6 +480,7 @@
         const name    = document.getElementById('b-name').value.trim();
         const contact = document.getElementById('b-contact').value.trim();
         const message = document.getElementById('b-message').value.trim();
+        const meetupDatetime = document.getElementById('b-meetup-datetime').value || null;
 
         if (!name)    { toast('Your name is required.', 'error'); return; }
         if (!contact) { toast('Your contact info is required.', 'error'); return; }
@@ -479,13 +495,23 @@
           const res = await fetch(`/api/community/${bookId}/borrow/`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requester_name: name, requester_contact: contact, message, request_type: requestType }),
+            body: JSON.stringify({ requester_name: name, requester_contact: contact, message, meetup_datetime: meetupDatetime, request_type: requestType }),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!res.ok) throw new Error(data.error || 'Failed to send request.');
           toast('Borrow request sent! The owner will get in touch with you. 🎉');
           borrowModal.style.display = 'none';
           borrowForm.reset();
+          // Save this request ID so the requester can track/edit/cancel it
+          try {
+            const myRequests = JSON.parse(localStorage.getItem('readpulse_my_requests') || '[]');
+            if (data.request && data.request.id && !myRequests.includes(data.request.id)) {
+              myRequests.push(data.request.id);
+              localStorage.setItem('readpulse_my_requests', JSON.stringify(myRequests));
+              const rbadge = document.getElementById('my-requests-badge');
+              if (rbadge) { rbadge.textContent = myRequests.length; rbadge.style.display = ''; }
+            }
+          } catch(e) {}
         } catch (err) {
           toast(err.message, 'error');
         } finally {
@@ -507,15 +533,15 @@
     } catch(e) {}
 
     // Edit modal open/close
-    const editModal  = document.getElementById('edit-modal');
-    const openEditBtn  = document.getElementById('open-edit-modal');
-    const closeEditBtn = document.getElementById('close-edit-modal');
+    const editModal     = document.getElementById('edit-modal');
+    const openEditBtn   = document.getElementById('open-edit-modal');
+    const closeEditBtn  = document.getElementById('close-edit-modal');
     const cancelEditBtn = document.getElementById('cancel-edit');
 
-    if (openEditBtn) openEditBtn.addEventListener('click', () => { editModal.style.display = 'flex'; });
-    if (closeEditBtn) closeEditBtn.addEventListener('click', () => { editModal.style.display = 'none'; });
+    if (openEditBtn)   openEditBtn.addEventListener('click', () => { editModal.style.display = 'flex'; });
+    if (closeEditBtn)  closeEditBtn.addEventListener('click', () => { editModal.style.display = 'none'; });
     if (cancelEditBtn) cancelEditBtn.addEventListener('click', () => { editModal.style.display = 'none'; });
-    if (editModal) editModal.addEventListener('click', e => { if (e.target === editModal) editModal.style.display = 'none'; });
+    if (editModal)     editModal.addEventListener('click', e => { if (e.target === editModal) editModal.style.display = 'none'; });
 
     // Edit form submit
     const editForm = document.getElementById('edit-form');
@@ -532,6 +558,7 @@
           location:      document.getElementById('e-location').value.trim(),
           owner_contact: document.getElementById('e-owner-contact').value.trim(),
           is_available:  document.getElementById('e-available').checked,
+          listing_type:  (document.querySelector('input[name="e-listing-type"]:checked') || {}).value || 'borrow',
         };
 
         try {
@@ -540,7 +567,7 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
           });
-          const data = await res.json();
+          const data = await safeJson(res);
           if (!res.ok) throw new Error(data.error || 'Update failed.');
           toast('Book listing updated! ✅');
           editModal.style.display = 'none';
@@ -564,7 +591,6 @@
         try {
           const res = await fetch(`/api/community/${bookId}/delete/`, { method: 'DELETE' });
           if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed.'); }
-          // Remove from localStorage
           try {
             const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
             const updated = myBooks.filter(id => id !== bookId);
@@ -601,13 +627,12 @@
         return;
       }
 
-      // Fetch all community books and filter to owned IDs
       try {
         const res = await fetch('/api/community/');
-        const data = await res.json();
+        const data = await safeJson(res);
         const books = (data.books || []).filter(b => myBookIds.includes(b.id));
 
-        // Sync localStorage: remove stale IDs (books that were deleted)
+        // Sync localStorage: remove stale IDs
         const validIds = books.map(b => b.id);
         const staleRemoved = myBookIds.filter(id => !validIds.includes(id));
         if (staleRemoved.length) {
@@ -678,7 +703,6 @@
           try {
             const res = await fetch(`/api/community/${id}/delete/`, { method: 'DELETE' });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed.'); }
-            // Remove from localStorage
             const current = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
             const updated = current.filter(i => i !== id);
             localStorage.setItem('readpulse_my_books', JSON.stringify(updated));

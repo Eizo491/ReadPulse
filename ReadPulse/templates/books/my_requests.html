@@ -1,0 +1,448 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}My Requests – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar rq-topbar">
+  <div class="rq-topbar-inner">
+    <div class="rq-topbar-icon">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+      </svg>
+    </div>
+    <div>
+      <div class="topbar-title">My Requests</div>
+      <div class="topbar-subtitle">Borrow &amp; swap requests you've submitted</div>
+    </div>
+  </div>
+  <div class="rq-header-stats" id="myrq-header-stats" style="display:none">
+    <div class="rq-stat-pill" id="myrq-stat-total"></div>
+    <div class="rq-stat-pill rq-stat-pending" id="myrq-stat-pending"></div>
+  </div>
+</div>
+
+<div class="page-content rq-page">
+
+  <!-- No requests in localStorage yet -->
+  <div id="myrq-no-history" class="rq-empty" style="display:none">
+    <div class="rq-empty-illustration">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <rect x="10" y="8" width="44" height="52" rx="4" fill="var(--accent-light)" stroke="var(--border)" stroke-width="1.5"/>
+        <rect x="18" y="20" width="28" height="3" rx="1.5" fill="var(--border)"/>
+        <rect x="18" y="27" width="22" height="3" rx="1.5" fill="var(--border)"/>
+        <rect x="18" y="34" width="25" height="3" rx="1.5" fill="var(--border)"/>
+        <circle cx="48" cy="48" r="12" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
+        <path d="M48 43v10M43 48h10" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+    <p class="rq-empty-title">No requests yet</p>
+    <p class="rq-empty-hint">When you send a borrow or swap request for a community book, it will appear here so you can track, edit, or cancel it.</p>
+    <a href="/community/" class="btn-primary" style="display:inline-flex;align-items:center;gap:6px;margin-top:12px;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+        <circle cx="9" cy="7" r="4"/>
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+      </svg>
+      Browse Community Books
+    </a>
+  </div>
+
+  <!-- Loading -->
+  <div id="myrq-loading" class="rq-loading" style="display:none">
+    <div class="rq-loading-spine">
+      <span></span><span></span><span></span>
+    </div>
+    <p>Loading your requests…</p>
+  </div>
+
+  <!-- Empty after fetch -->
+  <div id="myrq-empty" class="rq-empty" style="display:none">
+    <div class="rq-empty-illustration">
+      <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
+        <rect x="10" y="8" width="44" height="52" rx="4" fill="var(--accent-light)" stroke="var(--border)" stroke-width="1.5"/>
+        <rect x="18" y="20" width="28" height="3" rx="1.5" fill="var(--border)"/>
+        <rect x="18" y="27" width="22" height="3" rx="1.5" fill="var(--border)"/>
+      </svg>
+    </div>
+    <p class="rq-empty-title">Requests not found</p>
+    <p class="rq-empty-hint">Your saved requests may have been removed by their owners.</p>
+  </div>
+
+  <!-- List -->
+  <div id="myrq-list" class="rq-list" style="display:none"></div>
+</div>
+
+<!-- Edit Request Modal -->
+<div class="modal-overlay" id="edit-request-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Edit My Request</div>
+      <button class="modal-close" id="close-edit-request-modal" aria-label="Close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+        </svg>
+      </button>
+    </div>
+
+    <div class="borrow-book-preview" id="edit-rq-book-preview"></div>
+
+    <form id="edit-request-form" novalidate style="padding: 20px 24px 24px;">
+      <input type="hidden" id="edit-rq-id">
+      <div class="form-row">
+        <label class="form-label">Your Name <span class="req">*</span></label>
+        <input class="form-input" type="text" id="edit-rq-name" required>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Your Contact <span class="req">*</span></label>
+        <input class="form-input" type="text" id="edit-rq-contact" required>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Message to Owner <small>(optional)</small></label>
+        <textarea class="form-input" id="edit-rq-message" rows="3"></textarea>
+      </div>
+      <div class="form-row">
+        <label class="form-label">Preferred Meetup Date &amp; Time <small>(optional)</small></label>
+        <input class="form-input" type="datetime-local" id="edit-rq-meetup">
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-outline" id="cancel-edit-request">Cancel</button>
+        <button type="submit" class="btn-primary">Save Changes</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  // Safely parse fetch response — never crashes on HTML error pages
+  async function safeJson(res) {
+    const text = await res.text();
+    try { return JSON.parse(text); }
+    catch (_) { throw new Error(`Server error (${res.status}). Please try again.`); }
+  }
+
+  const listEl      = document.getElementById('myrq-list');
+  const loadingEl   = document.getElementById('myrq-loading');
+  const emptyEl     = document.getElementById('myrq-empty');
+  const noHistoryEl = document.getElementById('myrq-no-history');
+  const headerStats = document.getElementById('myrq-header-stats');
+  const statTotal   = document.getElementById('myrq-stat-total');
+  const statPending = document.getElementById('myrq-stat-pending');
+
+  const STATUS_META = {
+    pending:  { cls: 'rq-status-pending',  label: 'Pending' },
+    approved: { cls: 'rq-status-approved', label: 'Approved' },
+    declined: { cls: 'rq-status-declined', label: 'Declined' },
+    returned: { cls: 'rq-status-returned', label: 'Returned' },
+  };
+
+  function borrowIcon() {
+    return `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
+  }
+  function swapIcon() {
+    return `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`;
+  }
+
+  function toast(msg, type = 'success') {
+    const c = document.getElementById('toast-container');
+    if (!c) return;
+    const t = document.createElement('div');
+    t.className = `toast toast-${type}`;
+    t.textContent = msg;
+    c.appendChild(t);
+    setTimeout(() => t.classList.add('toast-visible'), 10);
+    setTimeout(() => { t.classList.remove('toast-visible'); setTimeout(() => t.remove(), 300); }, 3200);
+  }
+
+  // ── Get stored request IDs ──
+  function getMyRequestIds() {
+    try { return JSON.parse(localStorage.getItem('readpulse_my_requests') || '[]'); } catch(e) { return []; }
+  }
+
+  function setMyRequestIds(ids) {
+    localStorage.setItem('readpulse_my_requests', JSON.stringify(ids));
+    const badge = document.getElementById('my-requests-badge');
+    if (badge) {
+      badge.textContent = ids.length;
+      badge.style.display = ids.length ? '' : 'none';
+    }
+  }
+
+  // ── Render ──
+  function renderRequests(requests) {
+    listEl.innerHTML = '';
+    if (!requests.length) {
+      listEl.style.display = 'none';
+      emptyEl.style.display = '';
+      headerStats.style.display = 'none';
+      return;
+    }
+
+    listEl.style.display = '';
+    emptyEl.style.display = 'none';
+    headerStats.style.display = '';
+
+    const pending = requests.filter(r => r.status === 'pending').length;
+    statTotal.textContent   = `${requests.length} request${requests.length !== 1 ? 's' : ''}`;
+    statPending.textContent = `${pending} pending`;
+    statPending.style.display = pending ? '' : 'none';
+
+    requests.forEach((req, i) => {
+      const card = document.createElement('div');
+      card.className = 'rq-card';
+      card.style.animationDelay = `${i * 45}ms`;
+      const meta = STATUS_META[req.status] || { cls: '', label: req.status_display };
+      const date = new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
+      const isSwap = req.request_type === 'swap';
+      const isPending = req.status === 'pending';
+
+      const meetupStr = req.meetup_datetime
+        ? new Date(req.meetup_datetime).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+        : '';
+
+      card.innerHTML = `
+        <div class="rq-card-accent ${isSwap ? 'rq-accent-swap' : 'rq-accent-borrow'}"></div>
+        <div class="rq-card-body">
+          <div class="rq-card-top">
+            <div class="rq-type-tag ${isSwap ? 'rq-tag-swap' : 'rq-tag-borrow'}">
+              ${isSwap ? swapIcon() : borrowIcon()}
+              ${req.request_type_display}
+            </div>
+            <div class="rq-status-tag ${meta.cls}">${meta.label}</div>
+          </div>
+
+          <a href="/community/${req.book_id}/" class="rq-book-title">${req.book_title}</a>
+
+          <div class="rq-card-details">
+            <div class="rq-detail-item">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+              </svg>
+              <span class="rq-detail-label">Owner</span>
+              <span>${req.book_owner}</span>
+            </div>
+            <div class="rq-detail-sep">·</div>
+            <div class="rq-detail-item rq-detail-date">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+              </svg>
+              Sent ${date}
+            </div>
+            ${meetupStr ? `<div class="rq-detail-sep">·</div>
+            <div class="rq-detail-item">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+              </svg>
+              Meetup: ${meetupStr}
+            </div>` : ''}
+          </div>
+
+          ${req.message ? `<div class="rq-message">"${req.message}"</div>` : ''}
+
+          ${isPending ? `
+          <div class="rq-my-actions">
+            <button class="btn-outline btn-sm myrq-edit-btn" data-id="${req.id}"
+                    data-book-title="${req.book_title}"
+                    data-book-owner="${req.book_owner}"
+                    data-name="${req.requester_name}"
+                    data-contact="${req.requester_contact}"
+                    data-message="${(req.message||'').replace(/"/g,'&quot;')}"
+                    data-meetup="${req.meetup_datetime||''}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit Request
+            </button>
+            <button class="btn-danger btn-sm myrq-cancel-btn" data-id="${req.id}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+              </svg>
+              Cancel Request
+            </button>
+          </div>` : ''}
+        </div>`;
+      listEl.appendChild(card);
+    });
+
+    // Bind edit buttons
+    listEl.querySelectorAll('.myrq-edit-btn').forEach(btn => {
+      btn.addEventListener('click', () => openEditModal(btn.dataset));
+    });
+
+    // Bind cancel buttons
+    listEl.querySelectorAll('.myrq-cancel-btn').forEach(btn => {
+      btn.addEventListener('click', () => cancelRequest(parseInt(btn.dataset.id)));
+    });
+  }
+
+  // ── Load ──
+  async function loadMyRequests() {
+    const ids = getMyRequestIds();
+
+    if (!ids.length) {
+      noHistoryEl.style.display = '';
+      loadingEl.style.display = 'none';
+      return;
+    }
+
+    noHistoryEl.style.display = 'none';
+    loadingEl.style.display = '';
+    listEl.style.display = 'none';
+    emptyEl.style.display = 'none';
+
+    try {
+      // Fetch all requests in parallel
+      const results = await Promise.allSettled(
+        ids.map(id => fetch(`/api/community/requests/${id}/`).then(r => r.ok ? r.json() : null))
+      );
+
+      const requests = [];
+      const validIds = [];
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled' && r.value && r.value.request) {
+          requests.push(r.value.request);
+          validIds.push(ids[i]);
+        }
+        // If null (404), we silently drop the stale ID
+      });
+
+      // Prune stale IDs
+      if (validIds.length !== ids.length) {
+        setMyRequestIds(validIds);
+      }
+
+      renderRequests(requests);
+    } catch (e) {
+      toast('Failed to load your requests.', 'error');
+    } finally {
+      loadingEl.style.display = 'none';
+    }
+  }
+
+  // ── Cancel Request ──
+  async function cancelRequest(reqId) {
+    if (!confirm('Cancel this request? This cannot be undone.')) return;
+    try {
+      const res = await fetch(`/api/community/requests/${reqId}/cancel/`, { method: 'DELETE' });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel.');
+      toast('Request cancelled.');
+      // Remove from localStorage
+      const ids = getMyRequestIds().filter(id => id !== reqId);
+      setMyRequestIds(ids);
+      setTimeout(() => loadMyRequests(), 400);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  // ── Edit Modal ──
+  const editModal = document.getElementById('edit-request-modal');
+  const closeEditBtn = document.getElementById('close-edit-request-modal');
+  const cancelEditBtn = document.getElementById('cancel-edit-request');
+  const editForm = document.getElementById('edit-request-form');
+
+  function openEditModal(d) {
+    document.getElementById('edit-rq-id').value = d.id;
+    document.getElementById('edit-rq-name').value = d.name || '';
+    document.getElementById('edit-rq-contact').value = d.contact || '';
+    document.getElementById('edit-rq-message').value = d.message || '';
+
+    // Format meetup datetime for datetime-local input (strip seconds/timezone)
+    let meetupVal = '';
+    if (d.meetup) {
+      try {
+        const dt = new Date(d.meetup);
+        const pad = n => String(n).padStart(2, '0');
+        meetupVal = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+      } catch(e) {}
+    }
+    document.getElementById('edit-rq-meetup').value = meetupVal;
+
+    const preview = document.getElementById('edit-rq-book-preview');
+    preview.innerHTML = `
+      <div>
+        <div class="borrow-preview-title">${d.bookTitle || ''}</div>
+        <div class="borrow-preview-owner">Owned by ${d.bookOwner || ''}</div>
+      </div>`;
+
+    editModal.style.display = 'flex';
+  }
+
+  function closeEditModal() { editModal.style.display = 'none'; }
+  if (closeEditBtn) closeEditBtn.addEventListener('click', closeEditModal);
+  if (cancelEditBtn) cancelEditBtn.addEventListener('click', closeEditModal);
+  if (editModal) editModal.addEventListener('click', e => { if (e.target === editModal) closeEditModal(); });
+
+  if (editForm) {
+    editForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      const reqId = document.getElementById('edit-rq-id').value;
+      const name    = document.getElementById('edit-rq-name').value.trim();
+      const contact = document.getElementById('edit-rq-contact').value.trim();
+      const message = document.getElementById('edit-rq-message').value.trim();
+      const meetup  = document.getElementById('edit-rq-meetup').value || null;
+
+      if (!name)    { toast('Your name is required.', 'error'); return; }
+      if (!contact) { toast('Your contact info is required.', 'error'); return; }
+
+      const submitBtn = editForm.querySelector('[type=submit]');
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Saving…';
+
+      try {
+        const res = await fetch(`/api/community/requests/${reqId}/edit/`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requester_name: name, requester_contact: contact, message, meetup_datetime: meetup }),
+        });
+        const data = await safeJson(res);
+        if (!res.ok) throw new Error(data.error || 'Update failed.');
+        toast('Request updated! ✅');
+        closeEditModal();
+        setTimeout(() => loadMyRequests(), 400);
+      } catch (err) {
+        toast(err.message, 'error');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Save Changes';
+      }
+    });
+  }
+
+  // ── Add styles for my-actions row ──
+  const style = document.createElement('style');
+  style.textContent = `
+    .rq-my-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+      flex-wrap: wrap;
+    }
+    .my-requests-badge {
+      background: var(--accent);
+      color: #fff;
+      border-radius: 10px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 1px 6px;
+      min-width: 18px;
+      text-align: center;
+      margin-left: auto;
+    }
+  `;
+  document.head.appendChild(style);
+
+  loadMyRequests();
+})();
+</script>
+{% endblock %}
