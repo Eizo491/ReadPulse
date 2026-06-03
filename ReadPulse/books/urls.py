@@ -44,4 +44,8 @@ urlpatterns = [
     path('api/session/my-requests/', views.api_session_my_requests, name='api_session_my_requests_list'),
     path('api/session/my-requests/add/', views.api_session_add_my_request, name='api_session_my_requests_add'),
     path('api/session/my-requests/<int:request_id>/remove/', views.api_session_remove_my_request, name='api_session_my_requests_remove'),
+
+    # ── Notifications ──
+    path('api/notifications/', views.api_notifications, name='api_notifications'),
+    path('api/notifications/mark-read/', views.api_notifications_mark_read, name='api_notifications_mark_read'),
 ]

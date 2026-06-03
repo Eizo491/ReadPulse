@@ -2,6 +2,49 @@ from django.db import models
 from django.conf import settings
 
 
+class Notification(models.Model):
+    NOTIF_TYPES = [
+        ('new_request', 'New Borrow Request'),
+        ('request_approved', 'Request Approved'),
+        ('request_declined', 'Request Declined'),
+        ('request_returned', 'Request Returned'),
+    ]
+
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+    notif_type = models.CharField(max_length=30, choices=NOTIF_TYPES)
+    title = models.CharField(max_length=300)
+    body = models.TextField(blank=True, default='')
+    borrow_request = models.ForeignKey(
+        'BorrowRequest',
+        null=True, blank=True,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+    is_read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"[{self.notif_type}] → {self.recipient} | {self.title}"
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'notif_type': self.notif_type,
+            'title': self.title,
+            'body': self.body,
+            'borrow_request_id': self.borrow_request_id,
+            'is_read': self.is_read,
+            'created_at': self.created_at.isoformat(),
+        }
+
+
 class FavoriteBook(models.Model):
     google_books_id = models.CharField(max_length=100, unique=True)
     title = models.CharField(max_length=500)

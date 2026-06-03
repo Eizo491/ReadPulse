@@ -10,7 +10,7 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
-from .models import FavoriteBook, CommunityBook, BorrowRequest
+from .models import FavoriteBook, CommunityBook, BorrowRequest, Notification
 
 
 # ─────────────────────────────────────────────
@@ -476,7 +476,17 @@ def api_request_borrow(request, book_id):
         meetup_datetime=meetup_datetime,
         request_type=request_type,
     )
-    return JsonResponse({'message': 'Request submitted!', 'request': borrow.to_dict()}, status=201)
+    # Notify the book owner about the new request
+    if book.owner_user_id:
+        Notification.objects.create(
+            recipient_id=book.owner_user_id,
+            notif_type="new_request",
+            title=f"New {borrow.get_request_type_display()} Request",
+            body=f"{borrow.requester_name} requested to {borrow.request_type} your book \"{book.title}\".",
+            borrow_request=borrow,
+        )
+
+    return JsonResponse({"message": "Request submitted!", "request": borrow.to_dict()}, status=201)
 
 
 @csrf_exempt
@@ -509,7 +519,23 @@ def api_update_borrow_status(request, request_id):
         borrow.book.is_available = True
         borrow.book.save()
 
-    return JsonResponse({'message': 'Status updated.', 'request': borrow.to_dict()})
+    # Notify the requester about the status change
+    if borrow.requester_user_id and new_status in ("approved", "declined", "returned"):
+        notif_map = {
+            "approved":  ("request_approved",  "Request Approved",  f"Your request to borrow \"{borrow.book.title}\" has been approved!"),
+            "declined":  ("request_declined",  "Request Declined",  f"Your request to borrow \"{borrow.book.title}\" was declined."),
+            "returned":  ("request_returned",  "Book Returned",     f"\"{borrow.book.title}\" has been marked as returned. Thanks!"),
+        }
+        ntype, ntitle, nbody = notif_map[new_status]
+        Notification.objects.create(
+            recipient_id=borrow.requester_user_id,
+            notif_type=ntype,
+            title=ntitle,
+            body=nbody,
+            borrow_request=borrow,
+        )
+
+    return JsonResponse({"message": "Status updated.", "request": borrow.to_dict()})
 
 
 @login_required
@@ -785,3 +811,35 @@ def api_session_remove_my_request(request, request_id):
         request.session['readpulse_my_requests'] = ids
         request.session.modified = True
     return JsonResponse({'ids': ids})
+
+# ─────────────────────────────────────────────
+# Notifications API
+# ─────────────────────────────────────────────
+
+@login_required
+@require_http_methods(["GET"])
+def api_notifications(request):
+    """GET /api/notifications/ – list notifications for the logged-in user."""
+    notifs = Notification.objects.filter(recipient=request.user)
+    return JsonResponse({
+        'notifications': [n.to_dict() for n in notifs],
+        'unread_count': notifs.filter(is_read=False).count(),
+    })
+
+
+@csrf_exempt
+@login_required
+@require_http_methods(["POST"])
+def api_notifications_mark_read(request):
+    """POST /api/notifications/mark-read/ – mark all (or specific) notifications as read."""
+    try:
+        payload = json.loads(request.body) if request.body else {}
+    except json.JSONDecodeError:
+        payload = {}
+
+    ids = payload.get('ids')  # optional list of IDs; omit to mark all
+    qs = Notification.objects.filter(recipient=request.user, is_read=False)
+    if ids:
+        qs = qs.filter(id__in=ids)
+    updated = qs.update(is_read=True)
+    return JsonResponse({'marked_read': updated})
