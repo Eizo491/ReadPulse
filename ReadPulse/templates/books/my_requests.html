@@ -24,7 +24,7 @@
 
 <div class="page-content rq-page">
 
-  <!-- No requests in localStorage yet -->
+  <!-- No requests yet -->
   <div id="myrq-no-history" class="rq-empty" style="display:none">
     <div class="rq-empty-illustration">
       <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
@@ -162,15 +162,22 @@
     setTimeout(() => { t.classList.remove('toast-visible'); setTimeout(() => t.remove(), 300); }, 3200);
   }
 
-  // ── Get stored request IDs ──
-  function getMyRequestIds() {
-    try { return JSON.parse(localStorage.getItem('readpulse_my_requests') || '[]'); } catch(e) { return []; }
+  // ── Get / remove request IDs via server session (no localStorage) ──
+  async function getMyRequestIds() {
+    try {
+      const res = await fetch('/api/session/my-requests/');
+      const d = await res.json();
+      return d.ids || [];
+    } catch(e) { return []; }
   }
 
-  function setMyRequestIds(ids) {
-    localStorage.setItem('readpulse_my_requests', JSON.stringify(ids));
+  async function removeMyRequestId(id) {
+    try {
+      await fetch(`/api/session/my-requests/${id}/remove/`, {method: 'DELETE'});
+    } catch(e) {}
     const badge = document.getElementById('my-requests-badge');
     if (badge) {
+      const ids = await getMyRequestIds();
       badge.textContent = ids.length;
       badge.style.display = ids.length ? '' : 'none';
     }
@@ -203,6 +210,7 @@
       const date = new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
       const isSwap = req.request_type === 'swap';
       const isPending = req.status === 'pending';
+      const isApprovedBorrow = req.status === 'approved' && !isSwap;
 
       const meetupStr = req.meetup_datetime
         ? new Date(req.meetup_datetime).toLocaleString('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
@@ -269,6 +277,17 @@
               Cancel Request
             </button>
           </div>` : ''}
+
+          ${isApprovedBorrow ? `
+          <div class="rq-my-actions">
+            <button class="btn-return btn-sm myrq-return-btn" data-id="${req.id}">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 14 4 19 9 24" transform="scale(1,0.8) translate(0,3)"/>
+                <path d="M20 4v7a4 4 0 0 1-4 4H4"/>
+              </svg>
+              Mark as Returned
+            </button>
+          </div>` : ''}
         </div>`;
       listEl.appendChild(card);
     });
@@ -282,11 +301,16 @@
     listEl.querySelectorAll('.myrq-cancel-btn').forEach(btn => {
       btn.addEventListener('click', () => cancelRequest(parseInt(btn.dataset.id)));
     });
+
+    // Bind return buttons
+    listEl.querySelectorAll('.myrq-return-btn').forEach(btn => {
+      btn.addEventListener('click', () => returnBook(parseInt(btn.dataset.id)));
+    });
   }
 
   // ── Load ──
   async function loadMyRequests() {
-    const ids = getMyRequestIds();
+    const ids = await getMyRequestIds();
 
     if (!ids.length) {
       noHistoryEl.style.display = '';
@@ -302,22 +326,31 @@
     try {
       // Fetch all requests in parallel
       const results = await Promise.allSettled(
-        ids.map(id => fetch(`/api/community/requests/${id}/`).then(r => r.ok ? r.json() : null))
+        ids.map(id => fetch(`/api/community/requests/${id}/`).then(r => r.json().then(data => ({ ok: r.ok, data }))))
       );
 
       const requests = [];
       const validIds = [];
+      const staleIds = [];
       results.forEach((r, i) => {
-        if (r.status === 'fulfilled' && r.value && r.value.request) {
-          requests.push(r.value.request);
+        if (r.status === 'fulfilled' && r.value.ok && r.value.data && r.value.data.request) {
+          requests.push(r.value.data.request);
           validIds.push(ids[i]);
+        } else if (r.status === 'fulfilled' && !r.value.ok) {
+          staleIds.push(ids[i]);
         }
-        // If null (404), we silently drop the stale ID
+        // network errors: keep the ID, do not prune
       });
 
-      // Prune stale IDs
-      if (validIds.length !== ids.length) {
-        setMyRequestIds(validIds);
+      // Only prune IDs confirmed gone (404), not network failures
+      staleIds.forEach(id => removeMyRequestId(id));
+
+      // Update badge to reflect valid count
+      const badge = document.getElementById('my-requests-badge');
+      if (badge) {
+        const total = validIds.length;
+        badge.textContent = total;
+        badge.style.display = total ? '' : 'none';
       }
 
       renderRequests(requests);
@@ -336,9 +369,25 @@
       const data = await safeJson(res);
       if (!res.ok) throw new Error(data.error || 'Failed to cancel.');
       toast('Request cancelled.');
-      // Remove from localStorage
-      const ids = getMyRequestIds().filter(id => id !== reqId);
-      setMyRequestIds(ids);
+      removeMyRequestId(reqId);
+      setTimeout(() => loadMyRequests(), 400);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  // ── Return Book ──
+  async function returnBook(reqId) {
+    if (!confirm('Mark this book as returned? This will let the owner know the book is back.')) return;
+    try {
+      const res = await fetch(`/api/community/requests/${reqId}/status/`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'returned' }),
+      });
+      const data = await safeJson(res);
+      if (!res.ok) throw new Error(data.error || 'Failed to mark as returned.');
+      toast('Book marked as returned! ✅');
       setTimeout(() => loadMyRequests(), 400);
     } catch (err) {
       toast(err.message, 'error');
@@ -438,6 +487,24 @@
       min-width: 18px;
       text-align: center;
       margin-left: auto;
+    }
+    .btn-return {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1.5px solid #16a34a;
+      background: #f0fdf4;
+      color: #16a34a;
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-return:hover {
+      background: #16a34a;
+      color: #fff;
     }
   `;
   document.head.appendChild(style);

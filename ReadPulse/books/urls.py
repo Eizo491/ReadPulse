@@ -36,4 +36,12 @@ urlpatterns = [
     path('api/community/<int:book_id>/delete/', views.api_delete_community_book, name='api_community_delete'),
     path('api/community/<int:book_id>/', views.api_community_book_detail, name='api_community_detail'),
     path('api/community/', views.api_list_community_books, name='api_community_list'),
+
+    # ── Session-backed My Books & My Requests ──
+    path('api/session/my-books/', views.api_session_my_books, name='api_session_my_books_list'),
+    path('api/session/my-books/add/', views.api_session_add_my_book, name='api_session_my_books_add'),
+    path('api/session/my-books/<int:book_id>/remove/', views.api_session_remove_my_book, name='api_session_my_books_remove'),
+    path('api/session/my-requests/', views.api_session_my_requests, name='api_session_my_requests_list'),
+    path('api/session/my-requests/add/', views.api_session_add_my_request, name='api_session_my_requests_add'),
+    path('api/session/my-requests/<int:request_id>/remove/', views.api_session_remove_my_request, name='api_session_my_requests_remove'),
 ]

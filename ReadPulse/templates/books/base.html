@@ -104,25 +104,23 @@
 
 <script>
 (function() {
-  // Show My Books badge count from localStorage
-  try {
-    var ids = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
-    var badge = document.getElementById('my-books-badge');
-    if (badge && ids.length > 0) {
-      badge.textContent = ids.length;
-      badge.style.display = '';
-    }
-  } catch(e) {}
+  // Show My Books badge count from session API
+  fetch('/api/session/my-books/')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var ids = d.ids || [];
+      var badge = document.getElementById('my-books-badge');
+      if (badge && ids.length > 0) { badge.textContent = ids.length; badge.style.display = ''; }
+    }).catch(function(){});
 
-  // Show My Requests badge count from localStorage
-  try {
-    var rids = JSON.parse(localStorage.getItem('readpulse_my_requests') || '[]');
-    var rbadge = document.getElementById('my-requests-badge');
-    if (rbadge && rids.length > 0) {
-      rbadge.textContent = rids.length;
-      rbadge.style.display = '';
-    }
-  } catch(e) {}
+  // Show My Requests badge count from session API
+  fetch('/api/session/my-requests/')
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      var rids = d.ids || [];
+      var rbadge = document.getElementById('my-requests-badge');
+      if (rbadge && rids.length > 0) { rbadge.textContent = rids.length; rbadge.style.display = ''; }
+    }).catch(function(){});
 })();
 </script>
 

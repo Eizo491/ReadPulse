@@ -99,3 +99,7 @@ ACCOUNT_SIGNUP_FIELDS = [
 ] 
 
 GOOGLE_BOOKS_API_KEY = 'AIzaSyDXKHhFfTasXZrrEDybi-uJqmH3u9qsafY'
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+
+SESSION_SAVE_EVERY_REQUEST = True

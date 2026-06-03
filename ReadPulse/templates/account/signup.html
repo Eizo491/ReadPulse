@@ -4,7 +4,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReadPulse – Login</title>
+<title>ReadPulse – Sign Up</title>
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
 <style>
 body {
@@ -14,12 +14,12 @@ body {
   min-height: 100vh;
   background: var(--bg);
   margin: 0;
+  padding: 24px 16px;
 }
 
 .auth-wrap {
   width: 100%;
   max-width: 420px;
-  padding: 20px;
 }
 
 .auth-logo {
@@ -61,14 +61,25 @@ body {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 24px;
+  margin-bottom: 4px;
   text-align: center;
 }
 
-/* Messages */
-.auth-messages {
-  margin-bottom: 16px;
+.auth-subtitle {
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-bottom: 24px;
 }
+.auth-subtitle a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.auth-subtitle a:hover { text-decoration: underline; }
+
+/* Messages */
+.auth-messages { margin-bottom: 16px; }
 .auth-msg {
   background: var(--accent-light);
   border: 1px solid #f5d0be;
@@ -84,9 +95,22 @@ body {
   color: #b03a2e;
 }
 
+/* Non-field errors */
+.error-box {
+  background: #fdecea;
+  border: 1px solid #f5c6c6;
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.83rem;
+  color: #b03a2e;
+}
+.error-box ul { padding-left: 16px; margin: 0; }
+.error-box li + li { margin-top: 3px; }
+
 /* Fields */
 .field {
-  margin-bottom: 14px;
+  margin-bottom: 16px;
 }
 
 .field label {
@@ -116,14 +140,17 @@ body {
   transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
 }
 
-.field-input-wrap input::placeholder {
-  color: var(--text-muted);
-}
+.field-input-wrap input::placeholder { color: var(--text-muted); }
 
 .field-input-wrap input:focus {
   border-color: var(--accent);
   background: var(--surface);
   box-shadow: 0 0 0 3px rgba(196,112,79,0.12);
+}
+
+.field-input-wrap input.has-error {
+  border-color: #e05252;
+  background: #fff8f8;
 }
 
 .field-icon {
@@ -137,43 +164,26 @@ body {
   pointer-events: none;
 }
 
-/* Row: remember + forgot */
-.auth-meta {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
+.field-errors {
+  margin: 5px 0 0 2px;
+  padding: 0;
+  list-style: none;
+  font-size: 0.78rem;
+  color: #b03a2e;
+}
+.field-errors li + li { margin-top: 2px; }
+
+/* Password hint */
+.pw-hint {
+  margin-top: 5px;
+  font-size: 0.76rem;
+  color: var(--text-muted);
+  padding-left: 2px;
+  line-height: 1.5;
 }
 
-.remember {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  cursor: pointer;
-  user-select: none;
-}
-
-.remember input[type="checkbox"] {
-  width: 15px;
-  height: 15px;
-  accent-color: var(--accent);
-  cursor: pointer;
-  border-radius: 3px;
-}
-
-.forgot {
-  font-size: 0.85rem;
-  color: var(--accent);
-  text-decoration: none;
-  font-weight: 500;
-  transition: color 0.15s;
-}
-.forgot:hover { color: var(--accent-hover); text-decoration: underline; }
-
-/* Buttons */
-.btn-login {
+/* Submit */
+.btn-signup {
   display: block;
   width: 100%;
   padding: 12px;
@@ -188,14 +198,15 @@ body {
   letter-spacing: 0.2px;
   transition: background 0.18s, transform 0.12s, box-shadow 0.18s;
   box-shadow: 0 2px 8px rgba(196,112,79,0.25);
+  margin-top: 4px;
   margin-bottom: 16px;
 }
-.btn-login:hover {
+.btn-signup:hover {
   background: var(--accent-hover);
   transform: translateY(-1px);
   box-shadow: 0 4px 14px rgba(196,112,79,0.35);
 }
-.btn-login:active { transform: translateY(0); }
+.btn-signup:active { transform: translateY(0); }
 
 .divider {
   display: flex;
@@ -233,26 +244,11 @@ body {
   cursor: pointer;
   text-decoration: none;
   transition: background 0.18s, border-color 0.18s;
-  margin-bottom: 20px;
 }
 .btn-google:hover {
   background: var(--surface-hover);
   border-color: var(--text-muted);
 }
-
-.auth-footer {
-  text-align: center;
-  font-size: 0.85rem;
-  color: var(--text-secondary);
-  border-top: 1px solid var(--border-light);
-  padding-top: 18px;
-}
-.auth-footer a {
-  color: var(--accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-.auth-footer a:hover { text-decoration: underline; }
 </style>
 </head>
 <body>
@@ -265,7 +261,8 @@ body {
   </div>
 
   <div class="auth-card">
-    <h1>Welcome back</h1>
+    <h1>Create account</h1>
+    <p class="auth-subtitle">Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
 
     {% if messages %}
     <div class="auth-messages">
@@ -275,41 +272,98 @@ body {
     </div>
     {% endif %}
 
-    <form method="post" action="{% url 'account_login' %}">
+    {% if form.non_field_errors %}
+    <div class="error-box">
+      <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+    {% endif %}
+
+    <form method="post" action="{% url 'account_signup' %}">
       {% csrf_token %}
 
+      <!-- Username -->
       <div class="field">
-        <label for="id_login">Username or Email</label>
+        <label for="id_username">Username</label>
         <div class="field-input-wrap">
-          <input type="text" name="login" id="id_login" placeholder="Enter your username or email" required autocomplete="username">
+          <input
+            type="text" name="username" id="id_username"
+            placeholder="Choose a username"
+            value="{{ form.username.value|default:'' }}"
+            required autocomplete="username"
+            class="{% if form.username.errors %}has-error{% endif %}"
+          >
           <span class="field-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
           </span>
         </div>
+        {% if form.username.errors %}<ul class="field-errors">{% for e in form.username.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 
+      <!-- Email -->
       <div class="field">
-        <label for="id_password">Password</label>
+        <label for="id_email">Email address</label>
         <div class="field-input-wrap">
-          <input type="password" name="password" id="id_password" placeholder="Enter your password" required autocomplete="current-password">
+          <input
+            type="email" name="email" id="id_email"
+            placeholder="you@example.com"
+            value="{{ form.email.value|default:'' }}"
+            autocomplete="email"
+            class="{% if form.email.errors %}has-error{% endif %}"
+          >
+          <span class="field-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/>
+            </svg>
+          </span>
+        </div>
+        {% if form.email.errors %}<ul class="field-errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <!-- Password -->
+      <div class="field">
+        <label for="id_password1">Password</label>
+        <div class="field-input-wrap">
+          <input
+            type="password" name="password1" id="id_password1"
+            placeholder="At least 8 characters"
+            required autocomplete="new-password"
+            class="{% if form.password1.errors %}has-error{% endif %}"
+          >
           <span class="field-icon">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
             </svg>
           </span>
         </div>
+        {% if form.password1.errors %}
+          <ul class="field-errors">{% for e in form.password1.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+        {% else %}
+          <p class="pw-hint">Min. 8 characters · Not entirely numeric · Not too common</p>
+        {% endif %}
       </div>
 
-      <div class="auth-meta">
-        <label class="remember">
-          <input type="checkbox" name="remember"> Remember me
-        </label>
-        <a class="forgot" href="{% url 'account_reset_password' %}">Forgot password?</a>
+      <!-- Confirm Password -->
+      <div class="field">
+        <label for="id_password2">Confirm password</label>
+        <div class="field-input-wrap">
+          <input
+            type="password" name="password2" id="id_password2"
+            placeholder="Repeat your password"
+            required autocomplete="new-password"
+            class="{% if form.password2.errors %}has-error{% endif %}"
+          >
+          <span class="field-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </span>
+        </div>
+        {% if form.password2.errors %}<ul class="field-errors">{% for e in form.password2.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 
-      <button class="btn-login" type="submit">Sign In</button>
+      <button class="btn-signup" type="submit">Create Account</button>
     </form>
 
     <div class="divider"><span>or</span></div>
@@ -321,14 +375,10 @@ body {
         <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
         <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
       </svg>
-      Continue with Google
+      Sign up with Google
     </a>
 
-    <div class="auth-footer">
-      Don't have an account? <a href="{% url 'account_signup' %}">Register</a>
-    </div>
   </div>
-
 </div>
 </body>
 </html>

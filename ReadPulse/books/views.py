@@ -664,3 +664,104 @@ def api_list_all_requests(request):
         qs = qs.filter(request_type=type_filter)
 
     return JsonResponse({'requests': [r.to_dict() for r in qs], 'total': qs.count()})
+
+
+# ─────────────────────────────────────────────
+# Session-backed My Books & My Requests APIs
+# ─────────────────────────────────────────────
+
+@require_http_methods(["GET"])
+def api_session_my_books(request):
+    """GET /api/session/my-books/ – return IDs stored in session."""
+    ids = request.session.get('readpulse_my_books', [])
+    return JsonResponse({'ids': ids})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_session_add_my_book(request):
+    """POST /api/session/my-books/ – add a book ID to session."""
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+    book_id = payload.get('id')
+    if book_id is None:
+        return JsonResponse({'error': '"id" is required.'}, status=400)
+    ids = request.session.get('readpulse_my_books', [])
+    if book_id not in ids:
+        ids.append(book_id)
+        request.session['readpulse_my_books'] = ids
+        request.session.modified = True
+    return JsonResponse({'ids': ids})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_session_remove_my_book(request, book_id):
+    """DELETE /api/session/my-books/<id>/ – remove a book ID from session."""
+    ids = request.session.get('readpulse_my_books', [])
+    ids = [i for i in ids if i != book_id]
+    request.session['readpulse_my_books'] = ids
+    request.session.modified = True
+    return JsonResponse({'ids': ids})
+
+
+@require_http_methods(["GET"])
+def api_session_my_requests(request):
+    """GET /api/session/my-requests/ – return request IDs for the current user.
+    If logged in, queries the DB so requests survive logout/login.
+    Falls back to session for anonymous users."""
+    if request.user.is_authenticated:
+        ids = list(BorrowRequest.objects.filter(
+            requester_user=request.user
+        ).values_list('id', flat=True))
+    else:
+        ids = request.session.get('readpulse_my_requests', [])
+    return JsonResponse({'ids': ids})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_session_add_my_request(request):
+    """POST /api/session/my-requests/ – record that this user owns a request."""
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+    req_id = payload.get('id')
+    if req_id is None:
+        return JsonResponse({'error': '"id" is required.'}, status=400)
+
+    if request.user.is_authenticated:
+        # Link the request to the user in the DB
+        BorrowRequest.objects.filter(id=req_id).update(requester_user=request.user)
+        ids = list(BorrowRequest.objects.filter(
+            requester_user=request.user
+        ).values_list('id', flat=True))
+    else:
+        ids = request.session.get('readpulse_my_requests', [])
+        if req_id not in ids:
+            ids.append(req_id)
+            request.session['readpulse_my_requests'] = ids
+            request.session.modified = True
+    return JsonResponse({'ids': ids})
+
+
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_session_remove_my_request(request, request_id):
+    """DELETE /api/session/my-requests/<id>/ – disown a request."""
+    if request.user.is_authenticated:
+        BorrowRequest.objects.filter(
+            id=request_id, requester_user=request.user
+        ).update(requester_user=None)
+        ids = list(BorrowRequest.objects.filter(
+            requester_user=request.user
+        ).values_list('id', flat=True))
+    else:
+        ids = request.session.get('readpulse_my_requests', [])
+        ids = [i for i in ids if i != request_id]
+        request.session['readpulse_my_requests'] = ids
+        request.session.modified = True
+    return JsonResponse({'ids': ids})

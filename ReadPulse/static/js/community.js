@@ -15,6 +15,51 @@
     }
   }
 
+  // ── Session API helpers (replaces localStorage) ──────────────────────
+  async function sessionGetMyBooks() {
+    try {
+      const res = await fetch('/api/session/my-books/');
+      const d = await safeJson(res);
+      return d.ids || [];
+    } catch (_) { return []; }
+  }
+  async function sessionAddMyBook(id) {
+    try {
+      const res = await fetch('/api/session/my-books/add/', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+      });
+      const d = await safeJson(res);
+      return d.ids || [];
+    } catch (_) { return []; }
+  }
+  async function sessionRemoveMyBook(id) {
+    try {
+      const res = await fetch(`/api/session/my-books/${id}/remove/`, {method: 'DELETE'});
+      const d = await safeJson(res);
+      return d.ids || [];
+    } catch (_) { return []; }
+  }
+  // ── My Requests: server-session helpers (mirrors My Books pattern) ──
+  async function sessionAddMyRequest(id) {
+    try {
+      const res = await fetch('/api/session/my-requests/add/', {
+        method: 'POST', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({id})
+      });
+      const d = await safeJson(res);
+      return d.ids || [];
+    } catch (_) { return []; }
+  }
+  async function sessionRemoveMyRequest(id) {
+    try {
+      const res = await fetch(`/api/session/my-requests/${id}/remove/`, {method: 'DELETE'});
+      const d = await safeJson(res);
+      return d.ids || [];
+    } catch (_) { return []; }
+  }
+  // ─────────────────────────────────────────────────────────────────────
+
   function toast(msg, type = 'success') {
     const c = document.getElementById('toast-container');
     if (!c) return;
@@ -343,13 +388,9 @@
           if (!res.ok) throw new Error(data.error || 'Failed to list book.');
 
           try {
-            const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
-            if (!myBooks.includes(data.book.id)) {
-              myBooks.push(data.book.id);
-              localStorage.setItem('readpulse_my_books', JSON.stringify(myBooks));
-              const badge = document.getElementById('my-books-badge');
-              if (badge) { badge.textContent = myBooks.length; badge.style.display = ''; }
-            }
+            const updatedIds = await sessionAddMyBook(data.book.id);
+            const badge = document.getElementById('my-books-badge');
+            if (badge && updatedIds.length > 0) { badge.textContent = updatedIds.length; badge.style.display = ''; }
           } catch(e) {}
 
           toast('Book listed! Others can now see and borrow it. 📚');
@@ -386,7 +427,7 @@
         // Only show borrow requests panel if the current user is the book owner
         let isOwner = false;
         try {
-          const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
+          const myBooks = await sessionGetMyBooks();
           isOwner = myBooks.includes(bookId);
         } catch(e) {}
 
@@ -504,12 +545,10 @@
           borrowForm.reset();
           // Save this request ID so the requester can track/edit/cancel it
           try {
-            const myRequests = JSON.parse(localStorage.getItem('readpulse_my_requests') || '[]');
-            if (data.request && data.request.id && !myRequests.includes(data.request.id)) {
-              myRequests.push(data.request.id);
-              localStorage.setItem('readpulse_my_requests', JSON.stringify(myRequests));
+            if (data.request && data.request.id) {
+              const updatedIds = await sessionAddMyRequest(data.request.id);
               const rbadge = document.getElementById('my-requests-badge');
-              if (rbadge) { rbadge.textContent = myRequests.length; rbadge.style.display = ''; }
+              if (rbadge && updatedIds.length > 0) { rbadge.textContent = updatedIds.length; rbadge.style.display = ''; }
             }
           } catch(e) {}
         } catch (err) {
@@ -522,15 +561,17 @@
     }
 
     // ── Owner Actions (Edit / Delete) ──
-    try {
-      const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
-      if (myBooks.includes(bookId)) {
-        const ownerActions = document.getElementById('owner-actions');
-        if (ownerActions) ownerActions.style.display = '';
-        const borrowCta = document.getElementById('borrow-cta');
-        if (borrowCta) borrowCta.style.display = 'none';
-      }
-    } catch(e) {}
+    (async function() {
+      try {
+        const myBooks = await sessionGetMyBooks();
+        if (myBooks.includes(bookId)) {
+          const ownerActions = document.getElementById('owner-actions');
+          if (ownerActions) ownerActions.style.display = '';
+          const borrowCta = document.getElementById('borrow-cta');
+          if (borrowCta) borrowCta.style.display = 'none';
+        }
+      } catch(e) {}
+    })();
 
     // Edit modal open/close
     const editModal     = document.getElementById('edit-modal');
@@ -592,9 +633,7 @@
           const res = await fetch(`/api/community/${bookId}/delete/`, { method: 'DELETE' });
           if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed.'); }
           try {
-            const myBooks = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
-            const updated = myBooks.filter(id => id !== bookId);
-            localStorage.setItem('readpulse_my_books', JSON.stringify(updated));
+            await sessionRemoveMyBook(bookId);
           } catch(e) {}
           toast('Book listing removed.');
           setTimeout(() => { window.location.href = '/community/'; }, 900);
@@ -619,7 +658,7 @@
 
     async function loadMyBooks() {
       let myBookIds = [];
-      try { myBookIds = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]'); } catch(e) {}
+      try { myBookIds = await sessionGetMyBooks(); } catch(e) {}
 
       if (!myBookIds.length) {
         if (myBooksLoading) myBooksLoading.style.display = 'none';
@@ -632,11 +671,11 @@
         const data = await safeJson(res);
         const books = (data.books || []).filter(b => myBookIds.includes(b.id));
 
-        // Sync localStorage: remove stale IDs
+        // Sync session: remove stale IDs
         const validIds = books.map(b => b.id);
         const staleRemoved = myBookIds.filter(id => !validIds.includes(id));
         if (staleRemoved.length) {
-          localStorage.setItem('readpulse_my_books', JSON.stringify(validIds));
+          for (const staleId of staleRemoved) { await sessionRemoveMyBook(staleId); }
           const badge = document.getElementById('my-books-badge');
           if (badge) {
             if (validIds.length > 0) { badge.textContent = validIds.length; badge.style.display = ''; }
@@ -703,9 +742,7 @@
           try {
             const res = await fetch(`/api/community/${id}/delete/`, { method: 'DELETE' });
             if (!res.ok) { const d = await res.json(); throw new Error(d.error || 'Delete failed.'); }
-            const current = JSON.parse(localStorage.getItem('readpulse_my_books') || '[]');
-            const updated = current.filter(i => i !== id);
-            localStorage.setItem('readpulse_my_books', JSON.stringify(updated));
+            const updated = await sessionRemoveMyBook(id);
             const badge = document.getElementById('my-books-badge');
             if (badge) {
               if (updated.length > 0) { badge.textContent = updated.length; badge.style.display = ''; }

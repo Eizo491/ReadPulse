@@ -1,4 +1,5 @@
 from django.db import models
+from django.conf import settings
 
 
 class FavoriteBook(models.Model):
@@ -112,6 +113,7 @@ class BorrowRequest(models.Model):
     ]
 
     book = models.ForeignKey(CommunityBook, on_delete=models.CASCADE, related_name='borrow_requests')
+    requester_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='borrow_requests')
     requester_name = models.CharField(max_length=200)
     requester_contact = models.CharField(max_length=300)
     message = models.TextField(blank=True, default='')
