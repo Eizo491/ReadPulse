@@ -749,7 +749,53 @@ function closeReader() {
   if (viewerEl) viewerEl.innerHTML = '';
 }
 
+// ─── Mobile Sidebar Toggle ────────────────────────────────────
+
+function initMobileNav() {
+  const hamburger = document.getElementById('hamburger-btn');
+  const sidebar   = document.querySelector('.sidebar');
+  const overlay   = document.getElementById('sidebar-overlay');
+  if (!hamburger || !sidebar || !overlay) return;
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    overlay.classList.add('active');
+    document.body.classList.add('sidebar-is-open');
+    hamburger.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-is-open');
+    hamburger.setAttribute('aria-expanded', 'false');
+  }
+
+  hamburger.addEventListener('click', () => {
+    if (sidebar.classList.contains('sidebar-open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  // Close sidebar when a nav link is tapped on mobile
+  sidebar.querySelectorAll('.nav-item').forEach(link => {
+    link.addEventListener('click', () => {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+
+  // Close on Escape key
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeSidebar();
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
+  initMobileNav();
   initSearchPage();
   initFavoritesPage();
   initDetailPage();
