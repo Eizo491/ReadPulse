@@ -264,14 +264,6 @@ body {
     <h1>Create account</h1>
     <p class="auth-subtitle">Already have an account? <a href="{% url 'account_login' %}">Sign in</a></p>
 
-    {% if messages %}
-    <div class="auth-messages">
-      {% for message in messages %}
-      <div class="auth-msg {% if 'error' in message.tags %}error{% endif %}">{{ message }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
     {% if form.non_field_errors %}
     <div class="error-box">
       <ul>{% for e in form.non_field_errors %}<li>{{ e }}</li>{% endfor %}</ul>

@@ -267,14 +267,6 @@ body {
   <div class="auth-card">
     <h1>Welcome back</h1>
 
-    {% if messages %}
-    <div class="auth-messages">
-      {% for message in messages %}
-      <div class="auth-msg {% if 'error' in message.tags %}error{% endif %}">{{ message }}</div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
     <form method="post" action="{% url 'account_login' %}">
       {% csrf_token %}
 

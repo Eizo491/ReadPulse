@@ -8,8 +8,13 @@ Usage:
     python manage.py faker --clear    # wipe all CommunityBooks first, then seed
 """
 
+import random
+from datetime import timedelta
+
 from django.core.management.base import BaseCommand
-from books.models import CommunityBook
+from django.utils import timezone
+
+from books.models import BorrowRequest, CommunityBook
 
 
 BARANGAYS = [
@@ -379,6 +384,45 @@ BOOKS_DATA = [
 ]
 
 
+REQUESTER_NAMES = [
+    "Alicia Mendoza", "Bryan Castillo", "Carla Delos Santos", "Dennis Macaraeg",
+    "Elena Quirino", "Francis Galapon", "Grace Palacio", "Harold Sison",
+    "Iris Tanedo", "Jason Abad", "Karen Morales", "Leo Briones",
+    "Mila Custodio", "Noel Pineda", "Olivia Resurreccion", "Paolo Zulueta",
+    "Queenie Macalinao", "Renz Buenaventura", "Sheila Corpuz", "Tomas Ilagan",
+]
+
+REQUESTER_CONTACTS = [
+    "09171110001", "09282220002", "09393330003", "09504440004",
+    "09175550005", "09286660006", "09397770007", "09508880008",
+    "09179990009", "09281110010", "09392220011", "09503330012",
+    "09174440013", "09285550014", "09396660015", "09507770016",
+    "09178880017", "09289990018", "09391110019", "09502220020",
+]
+
+REQUEST_MESSAGES = [
+    "Hi! I'd love to borrow this book. I'll take good care of it.",
+    "I've been looking for this title for a while. Can we arrange a meetup?",
+    "Interested to read this. Please let me know your available schedule.",
+    "This is on my reading list! Hope we can arrange something soon.",
+    "I'm a careful reader — I'll return it in the same condition.",
+    "Would love to swap if that works for you. I have some good titles.",
+    "Been wanting to read this. Available most weekends for pickup.",
+    "Excited to get my hands on this one! Let me know when and where.",
+    "I'm a fast reader so I'll return it quickly. Thanks in advance!",
+    "I live nearby, happy to pick up at your convenience.",
+]
+
+MEETUP_LOCATIONS_NOTES = [
+    "Robinsons Place Palawan",
+    "Puerto Princesa City Hall",
+    "SM City Puerto Princesa",
+    "National Book Store, Puerto Princesa",
+    "Barangay Hall, San Jose",
+    "Rizal Avenue, Puerto Princesa",
+]
+
+
 class Command(BaseCommand):
     help = "Seed CommunityBook with 20 popular books in Puerto Princesa City barangays"
 
@@ -444,4 +488,73 @@ class Command(BaseCommand):
         )
         self.stdout.write(
             f"Total CommunityBooks in DB: {CommunityBook.objects.count()}"
+        )
+
+        # ── Seed BorrowRequests ──────────────────────────────────────────────
+        self.stdout.write("")
+        self.stdout.write("Seeding BorrowRequest data for Puerto Princesa City, Palawan...")
+        self.stdout.write("-" * 65)
+
+        if options["clear"]:
+            req_count = BorrowRequest.objects.count()
+            BorrowRequest.objects.all().delete()
+            self.stdout.write(self.style.WARNING(f"Cleared {req_count} existing BorrowRequest(s)."))
+
+        community_books = list(CommunityBook.objects.all())
+        if not community_books:
+            self.stdout.write(self.style.WARNING("No CommunityBooks found — skipping BorrowRequest seeding."))
+            return
+
+        req_created = 0
+        req_skipped = 0
+
+        for i, (name, contact) in enumerate(zip(REQUESTER_NAMES, REQUESTER_CONTACTS)):
+            book = community_books[i % len(community_books)]
+
+            exists = BorrowRequest.objects.filter(
+                requester_name=name,
+                book=book,
+            ).exists()
+
+            if exists:
+                self.stdout.write(f"  ⚠  Skipping (already exists): {name} → {book.title}")
+                req_skipped += 1
+                continue
+
+            # Spread meetup datetimes across the next 14 days
+            days_ahead = (i % 14) + 1
+            hour = 9 + (i % 8)  # 9 AM – 4 PM
+            meetup_dt = timezone.now().replace(
+                hour=hour, minute=0, second=0, microsecond=0
+            ) + timedelta(days=days_ahead)
+
+            request_type = "swap" if i % 5 == 0 else "borrow"
+            status_choices = ["pending", "pending", "approved", "declined", "returned"]
+            status = status_choices[i % len(status_choices)]
+
+            BorrowRequest.objects.create(
+                book=book,
+                requester_name=name,
+                requester_contact=contact,
+                message=REQUEST_MESSAGES[i % len(REQUEST_MESSAGES)],
+                meetup_datetime=meetup_dt,
+                request_type=request_type,
+                status=status,
+            )
+
+            self.stdout.write(
+                self.style.SUCCESS(
+                    f"  ✓  [{i+1:02d}] {name:<25} → {book.title[:35]:<35} [{request_type}/{status}]"
+                )
+            )
+            req_created += 1
+
+        self.stdout.write("-" * 65)
+        self.stdout.write(
+            self.style.SUCCESS(
+                f"Done!  Created: {req_created}  |  Skipped (duplicates): {req_skipped}"
+            )
+        )
+        self.stdout.write(
+            f"Total BorrowRequests in DB: {BorrowRequest.objects.count()}"
         )
