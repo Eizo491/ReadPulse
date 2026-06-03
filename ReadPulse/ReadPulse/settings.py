@@ -1,11 +1,12 @@
 from pathlib import Path
 import os
+import socket
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = 'django-insecure-ktvdk@s_5s@j3*(c9&vkqd#nzly(1ca2zd!_bskj(nny$5of&%'
 DEBUG = True
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'Kevin18.pythonanywhere.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -24,7 +25,10 @@ INSTALLED_APPS = [
     'pwa',
 ]
 
-SITE_ID = 2 
+if "pythonanywhere" in socket.gethostname():
+    SITE_ID = 4
+else:
+    SITE_ID = 3
  
 AUTHENTICATION_BACKENDS = [ 
     'django.contrib.auth.backends.ModelBackend',       
