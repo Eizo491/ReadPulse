@@ -26,9 +26,9 @@ INSTALLED_APPS = [
 ]
 
 if "pythonanywhere" in socket.gethostname():
-    SITE_ID = 4
-else:
     SITE_ID = 3
+else:
+    SITE_ID = 2
  
 AUTHENTICATION_BACKENDS = [ 
     'django.contrib.auth.backends.ModelBackend',       
