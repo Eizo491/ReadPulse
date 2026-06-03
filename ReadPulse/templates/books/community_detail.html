@@ -14,11 +14,11 @@
 </div>
 
 <div class="page-content">
-  <div class="detail-layout">
+  <div class="cd-layout">
 
     <!-- LEFT: Book info -->
-    <div class="detail-left">
-      <div class="detail-cover">
+    <div class="cd-left">
+      <div class="cd-cover">
         {% if book.thumbnail %}
         <img src="{{ book.thumbnail }}" alt="{{ book.title }}"
              onerror="this.parentElement.innerHTML='<div class=\'book-cover-placeholder large\'><svg width=\'48\' height=\'48\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><path d=\'M4 19.5A2.5 2.5 0 0 1 6.5 17H20\'/><path d=\'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\'/></svg><span>No Cover</span></div>'">
@@ -33,15 +33,15 @@
         {% endif %}
       </div>
 
-      <div class="detail-meta-list">
+      <div class="cd-meta-list">
         {% if book.condition %}
-        <div class="detail-meta-item">
-          <span class="meta-label">Condition</span>
+        <div class="cd-meta-item">
+          <span class="cd-meta-label">Condition</span>
           <span class="condition-badge condition-{{ book.condition }}">{{ book.get_condition_display }}</span>
         </div>
         {% endif %}
-        <div class="detail-meta-item">
-          <span class="meta-label">Available For</span>
+        <div class="cd-meta-item">
+          <span class="cd-meta-label">Available For</span>
           <span class="listing-type-badge listing-type-{{ book.listing_type }}">
             {% if book.listing_type == 'swap' %}
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
@@ -54,19 +54,19 @@
           </span>
         </div>
         {% if book.published_date %}
-        <div class="detail-meta-item">
-          <span class="meta-label">Published</span>
+        <div class="cd-meta-item">
+          <span class="cd-meta-label">Published</span>
           <span>{{ book.published_date|slice:":4" }}</span>
         </div>
         {% endif %}
         {% if book.categories %}
-        <div class="detail-meta-item">
-          <span class="meta-label">Genre</span>
+        <div class="cd-meta-item">
+          <span class="cd-meta-label">Genre</span>
           <span>{{ book.categories }}</span>
         </div>
         {% endif %}
-        <div class="detail-meta-item">
-          <span class="meta-label">Status</span>
+        <div class="cd-meta-item">
+          <span class="cd-meta-label">Status</span>
           {% if book.is_available %}
           <span class="availability-badge available">Available</span>
           {% else %}

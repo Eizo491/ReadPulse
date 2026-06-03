@@ -98,6 +98,12 @@ def api_book_detail(request, google_books_id):
         or image_links.get('thumbnail', '')
         or image_links.get('smallThumbnail', '')
     )
+    if thumbnail:
+        import re
+        thumbnail = re.sub(r'&?fife=\S+', '', thumbnail)
+        thumbnail = re.sub(r'zoom=\d+', 'zoom=1', thumbnail)
+        sep = '&' if '?' in thumbnail else '?'
+        thumbnail = thumbnail.rstrip('&') + f'{sep}fife=w600'
     if thumbnail.startswith('http://'):
         thumbnail = thumbnail.replace('http://', 'https://', 1)
 

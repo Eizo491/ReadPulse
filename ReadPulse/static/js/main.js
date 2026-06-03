@@ -528,7 +528,7 @@ function renderBookDetail(book) {
   document.title = `${book.title} – ReadPulse`;
 
   const coverHtml = book.thumbnail
-    ? `<img src="${escHtml(book.thumbnail)}" alt="${escHtml(book.title)}" class="detail-cover-img">`
+    ? `<img src="${escHtml(book.thumbnail.replace(/zoom=\d+/, 'zoom=3').replace(/&edge=curl/, ''))}" alt="${escHtml(book.title)}" class="detail-cover-img" style="width:100%;height:100%;object-fit:cover;display:block;">`
     : `<div class="detail-cover-placeholder">${noImageHtml()}</div>`;
 
   const stars = book.average_rating

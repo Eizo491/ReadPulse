@@ -166,16 +166,16 @@ function openBookDetail(bookId) {
   const ownerInitial = (book.owner_username || '?')[0].toUpperCase();
 
   const descriptionHtml = book.description
-    ? `<div class="detail-section">
-        <div class="detail-section-label">About this book</div>
-        <div class="detail-description">${escHtml(book.description)}</div>
+    ? `<div class="cmb-section">
+        <div class="cmb-section-label">About this book</div>
+        <div class="cmb-description">${escHtml(book.description)}</div>
        </div>`
     : '';
 
   const notesHtml = book.notes
-    ? `<div class="detail-section">
-        <div class="detail-section-label">Owner's Notes</div>
-        <div class="detail-notes">${escHtml(book.notes)}</div>
+    ? `<div class="cmb-section">
+        <div class="cmb-section-label">Owner's Notes</div>
+        <div class="cmb-notes">${escHtml(book.notes)}</div>
        </div>`
     : '';
 
@@ -187,33 +187,33 @@ function openBookDetail(bookId) {
   if (book.categories)     metaItems.push(`<span><strong>Genre:</strong> ${escHtml(book.categories)}</span>`);
 
   const metaHtml = metaItems.length
-    ? `<div class="detail-section"><div class="detail-meta-grid">${metaItems.join('')}</div></div>`
+    ? `<div class="cmb-section"><div class="cmb-meta-grid">${metaItems.join('')}</div></div>`
     : '';
 
   const contactHtml = book.contact_info
-    ? `<div class="detail-info-row">
+    ? `<div class="cmb-info-row">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 9.5a19.79 19.79 0 0 1-3-8.59A2 2 0 0 1 3.63 1h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 8.91a16 16 0 0 0 5.61 5.61l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
         <div>
-          <div class="detail-info-label">Contact</div>
-          <div class="detail-info-value">${escHtml(book.contact_info)}</div>
+          <div class="cmb-info-label">Contact</div>
+          <div class="cmb-info-value">${escHtml(book.contact_info)}</div>
         </div>
        </div>`
     : '';
 
   const locationHtml = book.location
-    ? `<div class="detail-info-row">
+    ? `<div class="cmb-info-row">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
         <div>
-          <div class="detail-info-label">Preferred Meetup Area</div>
-          <div class="detail-info-value">${escHtml(book.location)}</div>
+          <div class="cmb-info-label">Preferred Meetup Area</div>
+          <div class="cmb-info-value">${escHtml(book.location)}</div>
         </div>
        </div>`
     : '';
 
   const contactSectionHtml = (contactHtml || locationHtml)
-    ? `<div class="detail-section">
-        <div class="detail-section-label">Contact & Meetup</div>
-        <div class="detail-contact-block">${contactHtml}${locationHtml}</div>
+    ? `<div class="cmb-section">
+        <div class="cmb-section-label">Contact & Meetup</div>
+        <div class="cmb-contact-block">${contactHtml}${locationHtml}</div>
        </div>`
     : '';
 
@@ -225,15 +225,15 @@ function openBookDetail(bookId) {
        </button>`;
 
   document.getElementById('book-detail-body').innerHTML = `
-    <div class="detail-book-header">
-      <div class="detail-cover">
+    <div class="cmb-book-header">
+      <div class="cmb-cover">
         ${book.thumbnail
           ? `<img src="${escHtml(book.thumbnail)}" alt="${escHtml(book.title)}" style="width:100%;height:100%;object-fit:cover;border-radius:6px;">`
           : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:var(--bg-secondary);border-radius:6px;font-size:2.5rem;">📖</div>`}
       </div>
-      <div class="detail-header-info">
-        <div class="detail-book-title">${escHtml(book.title)}</div>
-        <div class="detail-book-author">${escHtml(book.authors) || 'Unknown author'}</div>
+      <div class="cmb-header-info">
+        <div class="cmb-book-title">${escHtml(book.title)}</div>
+        <div class="cmb-book-author">${escHtml(book.authors) || 'Unknown author'}</div>
         <div class="detail-badges" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
           ${typeBadge}
           <span class="badge badge-condition">${escHtml(book.condition)}</span>
