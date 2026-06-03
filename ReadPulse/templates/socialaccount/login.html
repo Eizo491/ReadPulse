@@ -1,11 +1,203 @@
 {% load static %}
-<!DOCTYPE html><html><head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ReadPulse Social Login</title>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ReadPulse – Sign In with {{ provider.name }}</title>
 <link rel="stylesheet" href="{% static 'css/main.css' %}">
-<style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;background:var(--bg)}.auth-card{background:white;padding:2rem;border-radius:14px;box-shadow:var(--shadow-md);max-width:420px;text-align:center}.btn{display:block;width:100%;padding:12px;background:var(--accent);color:white;border:none;border-radius:8px;text-decoration:none}</style>
-</head><body><div class="auth-card">
-<h2>Confirm Sign In</h2>
-<p>You are about to sign in using {{ provider.name }}.</p>
-<form method="post">{% csrf_token %}<button class="btn" type="submit">Continue</button></form>
-</div></body></html>
+<style>
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: var(--bg);
+    padding: 24px 16px;
+  }
+
+  .auth-wrap {
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .auth-logo {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .auth-logo a {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: 'Playfair Display', serif;
+    font-size: 1.8rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    text-decoration: none;
+    letter-spacing: -0.5px;
+  }
+
+  .auth-logo a span { color: var(--accent); }
+
+  .auth-logo .logo-sub {
+    display: block;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  .auth-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-md);
+    padding: 36px 36px 32px;
+    border: 1px solid var(--border-light);
+  }
+
+  .auth-card-accent {
+    height: 3px;
+    background: linear-gradient(90deg, var(--accent), #e8a882);
+    margin: -36px -36px 32px;
+    border-radius: 14px 14px 0 0;
+  }
+
+  .auth-card h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.45rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    text-align: center;
+  }
+
+  .auth-subtitle {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 28px;
+    line-height: 1.5;
+  }
+
+  /* Info row */
+  .confirm-info {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    background: var(--accent-light);
+    border: 1px solid #f0d5c4;
+    border-radius: var(--radius-sm);
+    padding: 14px 16px;
+    margin-bottom: 24px;
+  }
+
+  .confirm-info svg { flex-shrink: 0; margin-top: 1px; }
+
+  .confirm-info-text {
+    font-size: 0.83rem;
+    color: var(--text-secondary);
+    line-height: 1.5;
+  }
+
+  .confirm-info-text strong { color: var(--accent); font-weight: 600; }
+
+  /* Provider badge */
+  .provider-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-hover);
+    border: 1px solid var(--border);
+    border-radius: 100px;
+    padding: 4px 12px 4px 8px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+
+  .btn-primary {
+    display: block;
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition);
+    margin-bottom: 10px;
+  }
+
+  .btn-primary:hover { background: var(--accent-hover); }
+
+  .btn-secondary {
+    display: block;
+    width: 100%;
+    padding: 11px;
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    text-align: center;
+    text-decoration: none;
+    transition: background var(--transition), color var(--transition);
+  }
+
+  .btn-secondary:hover {
+    background: var(--surface-hover);
+    color: var(--text-primary);
+  }
+</style>
+</head>
+<body>
+
+<div class="auth-wrap">
+
+  <div class="auth-logo">
+    <a href="/">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+      Read<span>Pulse</span>
+    </a>
+    <span class="logo-sub">Your reading companion</span>
+  </div>
+
+  <div class="auth-card">
+    <div class="auth-card-accent"></div>
+
+    <h1>One last step</h1>
+    <p class="auth-subtitle">You're signing in via <strong>{{ provider.name }}</strong></p>
+
+    <div class="confirm-info">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+      </svg>
+      <div class="confirm-info-text">
+        ReadPulse will receive your <strong>name and email</strong> from {{ provider.name }}. We never post on your behalf.
+      </div>
+    </div>
+
+    <form method="post">
+      {% csrf_token %}
+      <button class="btn-primary" type="submit">Continue with {{ provider.name }}</button>
+    </form>
+
+    <a class="btn-secondary" href="{% url 'account_login' %}">← Back to sign in</a>
+  </div>
+
+</div>
+
+</body>
+</html>
