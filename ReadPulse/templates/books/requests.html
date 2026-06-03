@@ -4,228 +4,47 @@
 {% block title %}Book Requests – ReadPulse{% endblock %}
 
 {% block content %}
-<div class="topbar rq-topbar">
-  <div class="rq-topbar-inner">
-    <div class="rq-topbar-icon">
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10 9 9 9 8 9"/>
-      </svg>
-    </div>
-    <div>
-      <div class="topbar-title">Book Requests</div>
-      <div class="topbar-subtitle">All borrow &amp; swap requests from the community</div>
-    </div>
-  </div>
-  <div class="rq-header-stats" id="rq-header-stats" style="display:none">
-    <div class="rq-stat-pill" id="rq-stat-total"></div>
-    <div class="rq-stat-pill rq-stat-pending" id="rq-stat-pending"></div>
+<div class="topbar">
+  <div>
+    <div class="topbar-title">Book Requests</div>
+    <div class="topbar-subtitle">Manage borrow and swap requests</div>
   </div>
 </div>
 
-<div class="page-content rq-page">
+<div class="page-content">
 
-  <!-- Filter bar -->
-  <div class="rq-filter-bar">
-    <div class="rq-filter-section">
-      <span class="rq-filter-label">Status</span>
-      <div class="rq-chips" id="filter-status">
-        <button class="rq-chip active" data-value="">
-          <span class="rq-chip-dot rq-dot-all"></span>All
-        </button>
-        <button class="rq-chip" data-value="pending">
-          <span class="rq-chip-dot rq-dot-pending"></span>Pending
-        </button>
-        <button class="rq-chip" data-value="approved">
-          <span class="rq-chip-dot rq-dot-approved"></span>Approved
-        </button>
-        <button class="rq-chip" data-value="declined">
-          <span class="rq-chip-dot rq-dot-declined"></span>Declined
-        </button>
-        <button class="rq-chip" data-value="returned">
-          <span class="rq-chip-dot rq-dot-returned"></span>Returned
-        </button>
-      </div>
-    </div>
-    <div class="rq-filter-divider"></div>
-    <div class="rq-filter-section">
-      <span class="rq-filter-label">Type</span>
-      <div class="rq-chips" id="filter-type">
-        <button class="rq-chip active" data-value="">All</button>
-        <button class="rq-chip" data-value="borrow">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Borrow
-        </button>
-        <button class="rq-chip" data-value="swap">
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-          Swap
-        </button>
-      </div>
+  <!-- Tabs -->
+  <div class="req-tabs">
+    <button class="req-tab active" data-tab="my-requests">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      My Requests
+      <span class="req-tab-badge" id="my-req-badge" hidden></span>
+    </button>
+    <button class="req-tab" data-tab="incoming">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13.5a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2.69h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L7.91 10a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+      Incoming Requests
+      <span class="req-tab-badge" id="incoming-badge" hidden></span>
+    </button>
+  </div>
+
+  <!-- My Requests Panel -->
+  <div id="panel-my-requests" class="req-panel">
+    <div id="my-requests-area">
+      <div class="status-msg"><span class="status-icon">⏳</span><p>Loading your requests…</p></div>
     </div>
   </div>
 
-  <!-- List area -->
-  <div id="requests-area">
-    <div id="requests-loading" class="rq-loading">
-      <div class="rq-loading-spine">
-        <span></span><span></span><span></span>
-      </div>
-      <p>Loading requests…</p>
+  <!-- Incoming Requests Panel -->
+  <div id="panel-incoming" class="req-panel" hidden>
+    <div id="incoming-area">
+      <div class="status-msg"><span class="status-icon">⏳</span><p>Loading incoming requests…</p></div>
     </div>
-    <div id="requests-empty" class="rq-empty" style="display:none">
-      <div class="rq-empty-illustration">
-        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-          <rect x="10" y="8" width="44" height="52" rx="4" fill="var(--accent-light)" stroke="var(--border)" stroke-width="1.5"/>
-          <rect x="18" y="20" width="28" height="3" rx="1.5" fill="var(--border)"/>
-          <rect x="18" y="27" width="22" height="3" rx="1.5" fill="var(--border)"/>
-          <rect x="18" y="34" width="25" height="3" rx="1.5" fill="var(--border)"/>
-          <circle cx="48" cy="48" r="12" fill="var(--bg)" stroke="var(--border)" stroke-width="1.5"/>
-          <path d="M43 48h10M48 43v10" stroke="var(--text-muted)" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-      </div>
-      <p class="rq-empty-title">No requests yet</p>
-      <p class="rq-empty-hint">Requests will appear here once readers start borrowing or swapping books from the community.</p>
-    </div>
-    <div id="requests-list" class="rq-list" style="display:none"></div>
   </div>
+
 </div>
 {% endblock %}
 
 {% block scripts %}
 <script src="{% static 'js/main.js' %}"></script>
-<script>
-(function () {
-  'use strict';
-
-  const listEl      = document.getElementById('requests-list');
-  const loadingEl   = document.getElementById('requests-loading');
-  const emptyEl     = document.getElementById('requests-empty');
-  const statTotal   = document.getElementById('rq-stat-total');
-  const statPending = document.getElementById('rq-stat-pending');
-  const headerStats = document.getElementById('rq-header-stats');
-
-  let activeStatus = '';
-  let activeType   = '';
-
-  const STATUS_META = {
-    pending:  { cls: 'rq-status-pending',  label: 'Pending' },
-    approved: { cls: 'rq-status-approved', label: 'Approved' },
-    declined: { cls: 'rq-status-declined', label: 'Declined' },
-    returned: { cls: 'rq-status-returned', label: 'Returned' },
-  };
-
-  function borrowIcon() {
-    return `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
-  }
-  function swapIcon() {
-    return `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>`;
-  }
-
-  function renderRequests(requests) {
-    listEl.innerHTML = '';
-    if (!requests.length) {
-      listEl.style.display = 'none';
-      emptyEl.style.display = '';
-      headerStats.style.display = 'none';
-      return;
-    }
-    listEl.style.display = '';
-    emptyEl.style.display = 'none';
-    headerStats.style.display = '';
-
-    const pending = requests.filter(r => r.status === 'pending').length;
-    statTotal.textContent   = `${requests.length} request${requests.length !== 1 ? 's' : ''}`;
-    statPending.textContent = `${pending} pending`;
-    statPending.style.display = pending ? '' : 'none';
-
-    requests.forEach((req, i) => {
-      const card = document.createElement('div');
-      card.className = 'rq-card';
-      card.style.animationDelay = `${i * 45}ms`;
-      const meta = STATUS_META[req.status] || { cls: '', label: req.status_display };
-      const date = new Date(req.created_at).toLocaleDateString('en-PH', { month: 'short', day: 'numeric', year: 'numeric' });
-      const isSwap = req.request_type === 'swap';
-
-      card.innerHTML = `
-        <div class="rq-card-accent ${isSwap ? 'rq-accent-swap' : 'rq-accent-borrow'}"></div>
-        <div class="rq-card-body">
-          <div class="rq-card-top">
-            <div class="rq-type-tag ${isSwap ? 'rq-tag-swap' : 'rq-tag-borrow'}">
-              ${isSwap ? swapIcon() : borrowIcon()}
-              ${req.request_type_display}
-            </div>
-            <div class="rq-status-tag ${meta.cls}">${meta.label}</div>
-          </div>
-
-          <a href="/community/${req.book_id}/" class="rq-book-title">${req.book_title}</a>
-
-          <div class="rq-card-details">
-            <div class="rq-detail-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-              </svg>
-              <span class="rq-detail-label">Owner</span>
-              <span>${req.book_owner}</span>
-            </div>
-            <div class="rq-detail-sep">·</div>
-            <div class="rq-detail-item">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-              </svg>
-              <span class="rq-detail-label">From</span>
-              <span>${req.requester_name}</span>
-            </div>
-            <div class="rq-detail-sep">·</div>
-            <div class="rq-detail-item rq-detail-date">
-              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
-              </svg>
-              ${date}
-            </div>
-          </div>
-
-          ${req.message ? `<div class="rq-message">"${req.message}"</div>` : ''}
-        </div>`;
-      listEl.appendChild(card);
-    });
-  }
-
-  async function loadRequests() {
-    loadingEl.style.display = '';
-    listEl.style.display = 'none';
-    emptyEl.style.display = 'none';
-    try {
-      const params = new URLSearchParams();
-      if (activeStatus) params.set('status', activeStatus);
-      if (activeType)   params.set('type', activeType);
-      const res  = await fetch('/api/community/all-requests/?' + params.toString());
-      const data = await res.json();
-      renderRequests(data.requests || []);
-    } catch (e) {
-      emptyEl.style.display = '';
-    } finally {
-      loadingEl.style.display = 'none';
-    }
-  }
-
-  function bindChips(groupId) {
-    document.querySelectorAll(`#${groupId} .rq-chip`).forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll(`#${groupId} .rq-chip`).forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        if (groupId === 'filter-status') activeStatus = btn.dataset.value;
-        else activeType = btn.dataset.value;
-        loadRequests();
-      });
-    });
-  }
-
-  bindChips('filter-status');
-  bindChips('filter-type');
-  loadRequests();
-})();
-</script>
+<script src="{% static 'js/requests.js' %}"></script>
 {% endblock %}

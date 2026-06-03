@@ -1,52 +1,10 @@
 from django.db import models
-from django.conf import settings
-
-
-class Notification(models.Model):
-    NOTIF_TYPES = [
-        ('new_request', 'New Borrow Request'),
-        ('request_approved', 'Request Approved'),
-        ('request_declined', 'Request Declined'),
-        ('request_returned', 'Request Returned'),
-    ]
-
-    recipient = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name='notifications',
-    )
-    notif_type = models.CharField(max_length=30, choices=NOTIF_TYPES)
-    title = models.CharField(max_length=300)
-    body = models.TextField(blank=True, default='')
-    borrow_request = models.ForeignKey(
-        'BorrowRequest',
-        null=True, blank=True,
-        on_delete=models.CASCADE,
-        related_name='notifications',
-    )
-    is_read = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return f"[{self.notif_type}] → {self.recipient} | {self.title}"
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'notif_type': self.notif_type,
-            'title': self.title,
-            'body': self.body,
-            'borrow_request_id': self.borrow_request_id,
-            'is_read': self.is_read,
-            'created_at': self.created_at.isoformat(),
-        }
+from django.contrib.auth.models import User
 
 
 class FavoriteBook(models.Model):
-    google_books_id = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorites', null=True, blank=True)
+    google_books_id = models.CharField(max_length=100)
     title = models.CharField(max_length=500)
     authors = models.CharField(max_length=500, blank=True, default='')
     description = models.TextField(blank=True, default='')
@@ -59,6 +17,7 @@ class FavoriteBook(models.Model):
 
     class Meta:
         ordering = ['-created_at']
+        unique_together = ('user', 'google_books_id')
 
     def __str__(self):
         return self.title
@@ -78,92 +37,39 @@ class FavoriteBook(models.Model):
             'is_favorite': True,
         }
 
+
 class CommunityBook(models.Model):
-
-    CONDITION_CHOICES = [
-        ('new', 'New'),
-        ('like_new', 'Like New'),
-        ('good', 'Good'),
-        ('fair', 'Fair'),
-        ('worn', 'Worn'),
-    ]
-
     LISTING_TYPE_CHOICES = [
-        ('borrow', 'Borrow'),
-        ('swap', 'Swap'),
+        ('borrow', 'Available to Borrow'),
+        ('swap', 'Available to Swap'),
         ('both', 'Borrow or Swap'),
     ]
+    STATUS_CHOICES = [
+        ('available', 'Available'),
+        ('borrowed', 'Borrowed'),
+        ('swapped', 'Swapped'),
+        ('unavailable', 'Unavailable'),
+    ]
 
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='community_books')
     title = models.CharField(max_length=500)
     authors = models.CharField(max_length=500, blank=True, default='')
     description = models.TextField(blank=True, default='')
     thumbnail = models.TextField(blank=True, default='')
     published_date = models.CharField(max_length=50, blank=True, default='')
+    page_count = models.IntegerField(null=True, blank=True)
     categories = models.CharField(max_length=500, blank=True, default='')
+    isbn = models.CharField(max_length=30, blank=True, default='')
+    publisher = models.CharField(max_length=300, blank=True, default='')
+    language = models.CharField(max_length=50, blank=True, default='')
     google_books_id = models.CharField(max_length=100, blank=True, default='')
-
-    owner_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='listed_books')
-    owner_name = models.CharField(max_length=200)
-    owner_contact = models.CharField(max_length=300, blank=True, default='')
-    location = models.CharField(max_length=300, blank=True, default='')
-    condition = models.CharField(max_length=20, choices=CONDITION_CHOICES, default='good')
-    notes = models.TextField(blank=True, default='')
-
     listing_type = models.CharField(max_length=10, choices=LISTING_TYPE_CHOICES, default='borrow')
-    is_available = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ['-created_at']
-
-    def __str__(self):
-        return self.title
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'google_books_id': self.google_books_id,
-            'title': self.title,
-            'authors': self.authors,
-            'description': self.description,
-            'thumbnail': self.thumbnail,
-            'published_date': self.published_date,
-            'categories': self.categories,
-            'owner_name': self.owner_name,
-            'owner_contact': self.owner_contact,
-            'location': self.location,
-            'condition': self.condition,
-            'condition_display': self.get_condition_display(),
-            'listing_type': self.listing_type,
-            'listing_type_display': self.get_listing_type_display(),
-            'notes': self.notes,
-            'is_available': self.is_available,
-            'created_at': self.created_at.isoformat(),
-        }
-
-
-class BorrowRequest(models.Model):
-
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('approved', 'Approved'),
-        ('declined', 'Declined'),
-        ('returned', 'Returned'),
-    ]
-
-    REQUEST_TYPE_CHOICES = [
-        ('borrow', 'Borrow'),
-        ('swap', 'Swap'),
-    ]
-
-    book = models.ForeignKey(CommunityBook, on_delete=models.CASCADE, related_name='borrow_requests')
-    requester_user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name='borrow_requests')
-    requester_name = models.CharField(max_length=200)
-    requester_contact = models.CharField(max_length=300)
-    message = models.TextField(blank=True, default='')
-    meetup_datetime = models.DateTimeField(null=True, blank=True)
-    request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES, default='borrow')
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    condition = models.CharField(max_length=100, blank=True, default='Good')
+    notes = models.TextField(blank=True, default='')
+    # Owner contact & meetup details
+    contact_info = models.CharField(max_length=300, blank=True, default='')
+    location = models.CharField(max_length=300, blank=True, default='')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='available')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -171,22 +77,101 @@ class BorrowRequest(models.Model):
         ordering = ['-created_at']
 
     def __str__(self):
-        return f"{self.requester_name} → {self.book.title} [{self.status}]"
+        return f"{self.title} ({self.owner.username})"
 
-    def to_dict(self):
+    def to_dict(self, request_user=None):
         return {
             'id': self.id,
-            'book_id': self.book_id,
-            'book_title': self.book.title,
-            'book_owner': self.book.owner_name,
-            'requester_name': self.requester_name,
-            'requester_contact': self.requester_contact,
-            'message': self.message,
-            'meetup_datetime': self.meetup_datetime.isoformat() if self.meetup_datetime else None,
-            'request_type': self.request_type,
-            'request_type_display': self.get_request_type_display(),
+            'owner_id': self.owner_id,
+            'owner_username': self.owner.username,
+            'owner_name': self.owner.get_full_name() or self.owner.username,
+            'title': self.title,
+            'authors': self.authors,
+            'description': self.description,
+            'thumbnail': self.thumbnail,
+            'published_date': self.published_date,
+            'page_count': self.page_count,
+            'categories': self.categories,
+            'isbn': self.isbn,
+            'publisher': self.publisher,
+            'language': self.language,
+            'google_books_id': self.google_books_id,
+            'listing_type': self.listing_type,
+            'condition': self.condition,
+            'notes': self.notes,
+            'contact_info': self.contact_info,
+            'location': self.location,
             'status': self.status,
-            'status_display': self.get_status_display(),
+            'created_at': self.created_at.isoformat(),
+            'is_own': request_user and request_user.id == self.owner_id,
+        }
+
+
+class BookRequest(models.Model):
+    REQUEST_TYPE_CHOICES = [
+        ('borrow', 'Borrow'),
+        ('swap', 'Swap'),
+    ]
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('accepted', 'Accepted'),
+        ('declined', 'Declined'),
+        ('completed', 'Completed'),
+        ('cancelled', 'Cancelled'),
+    ]
+
+    community_book = models.ForeignKey(CommunityBook, on_delete=models.CASCADE, related_name='requests')
+    requester = models.ForeignKey(User, on_delete=models.CASCADE, related_name='book_requests_made')
+    request_type = models.CharField(max_length=10, choices=REQUEST_TYPE_CHOICES)
+    message = models.TextField(blank=True, default='')
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default='pending')
+    # Meetup details — proposed by requester
+    meetup_datetime = models.CharField(max_length=200, blank=True, default='')
+    meetup_location = models.CharField(max_length=300, blank=True, default='')
+    # Swap offer — filled only when request_type == 'swap'
+    swap_book_title = models.CharField(max_length=500, blank=True, default='')
+    swap_book_authors = models.CharField(max_length=500, blank=True, default='')
+    swap_book_thumbnail = models.TextField(blank=True, default='')
+    swap_book_condition = models.CharField(max_length=100, blank=True, default='Good')
+    swap_book_description = models.TextField(blank=True, default='')
+    swap_book_google_id = models.CharField(max_length=100, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('community_book', 'requester', 'request_type')
+
+    def __str__(self):
+        return f"{self.requester.username} → {self.community_book.title} ({self.request_type})"
+
+    def to_dict(self, perspective='requester'):
+        return {
+            'id': self.id,
+            'book_id': self.community_book_id,
+            'book_title': self.community_book.title,
+            'book_thumbnail': self.community_book.thumbnail,
+            'book_authors': self.community_book.authors,
+            'book_owner_username': self.community_book.owner.username,
+            'book_owner_name': self.community_book.owner.get_full_name() or self.community_book.owner.username,
+            'book_contact_info': self.community_book.contact_info,
+            'book_location': self.community_book.location,
+            'requester_id': self.requester_id,
+            'requester_username': self.requester.username,
+            'requester_name': self.requester.get_full_name() or self.requester.username,
+            'request_type': self.request_type,
+            'message': self.message,
+            'status': self.status,
+            # Meetup
+            'meetup_datetime': self.meetup_datetime,
+            'meetup_location': self.meetup_location,
+            # Swap offer details
+            'swap_book_title': self.swap_book_title,
+            'swap_book_authors': self.swap_book_authors,
+            'swap_book_thumbnail': self.swap_book_thumbnail,
+            'swap_book_condition': self.swap_book_condition,
+            'swap_book_description': self.swap_book_description,
+            'swap_book_google_id': self.swap_book_google_id,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat(),
         }

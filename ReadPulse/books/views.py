@@ -9,8 +9,9 @@ from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
+from django.db.models import Q
 
-from .models import FavoriteBook, CommunityBook, BorrowRequest, Notification
+from .models import FavoriteBook, CommunityBook, BookRequest
 
 
 # ─────────────────────────────────────────────
@@ -19,15 +20,13 @@ from .models import FavoriteBook, CommunityBook, BorrowRequest, Notification
 
 @login_required
 def search_page(request):
-    """Render the Search Books page."""
-    fav_count = FavoriteBook.objects.count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count()
     return render(request, 'books/search.html', {'fav_count': fav_count})
 
 
 @login_required
 def book_detail_page(request, google_books_id):
-    """Render the Book Detail page."""
-    fav_count = FavoriteBook.objects.count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count()
     return render(request, 'books/book_detail.html', {
         'google_books_id': google_books_id,
         'fav_count': fav_count,
@@ -36,23 +35,37 @@ def book_detail_page(request, google_books_id):
 
 @login_required
 def favorites_page(request):
-    """Render the Favorites page."""
-    favorites = FavoriteBook.objects.all()
+    favorites = FavoriteBook.objects.filter(user=request.user)
     return render(request, 'books/favorites.html', {
         'favorites': favorites,
         'fav_count': favorites.count(),
     })
 
 
+@login_required
+def community_page(request):
+    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    return render(request, 'books/community.html', {'fav_count': fav_count})
+
+
+@login_required
+def my_listings_page(request):
+    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    return render(request, 'books/my_listings.html', {'fav_count': fav_count})
+
+
+@login_required
+def requests_page(request):
+    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    return render(request, 'books/requests.html', {'fav_count': fav_count})
+
+
 # ─────────────────────────────────────────────
-# RESTful API  –  /api/...
+# RESTful API  –  Google Books
 # ─────────────────────────────────────────────
 
 @require_http_methods(["GET"])
 def api_book_detail(request, google_books_id):
-    """
-    GET /api/books/<google_books_id>/ – fetch a single book's full details from Google Books API.
-    """
     api_key = getattr(settings, 'GOOGLE_BOOKS_API_KEY', '').strip()
     if not api_key:
         return JsonResponse({'error': 'Google Books API key is not configured on the server.'}, status=500)
@@ -77,7 +90,6 @@ def api_book_detail(request, google_books_id):
     sale_info = item.get('saleInfo', {})
     image_links = info.get('imageLinks', {})
 
-    # Prefer largest available image
     thumbnail = (
         image_links.get('extraLarge', '')
         or image_links.get('large', '')
@@ -89,7 +101,7 @@ def api_book_detail(request, google_books_id):
     if thumbnail.startswith('http://'):
         thumbnail = thumbnail.replace('http://', 'https://', 1)
 
-    favorite_ids = set(FavoriteBook.objects.values_list('google_books_id', flat=True))
+    favorite_ids = set(FavoriteBook.objects.filter(user=request.user).values_list('google_books_id', flat=True)) if request.user.is_authenticated else set()
 
     book = {
         'google_books_id': google_books_id,
@@ -118,13 +130,9 @@ def api_book_detail(request, google_books_id):
     return JsonResponse({'book': book})
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_search_books(request):
-    """
-    GET /api/search/?q=<query>&max_results=<n>&start_index=<n>
-    Proxy the Google Books API and return JSON.
-    API key is read from settings.GOOGLE_BOOKS_API_KEY.
-    """
     query = request.GET.get('q', '').strip()
     max_results = request.GET.get('max_results', '20')
     start_index = request.GET.get('start_index', '0')
@@ -167,7 +175,7 @@ def api_search_books(request):
 
     items = data.get('items', [])
     books = []
-    favorite_ids = set(FavoriteBook.objects.values_list('google_books_id', flat=True))
+    favorite_ids = set(FavoriteBook.objects.filter(user=request.user).values_list('google_books_id', flat=True))
 
     for item in items:
         info = item.get('volumeInfo', {})
@@ -176,7 +184,6 @@ def api_search_books(request):
             image_links.get('thumbnail', '')
             or image_links.get('smallThumbnail', '')
         )
-        # Upgrade to HTTPS
         if thumbnail.startswith('http://'):
             thumbnail = thumbnail.replace('http://', 'https://', 1)
 
@@ -204,10 +211,6 @@ def api_search_books(request):
 
 @require_http_methods(["GET"])
 def api_search_audiobooks(request):
-    """
-    GET /api/search-audiobooks/?q=<query>&page=<n>
-    Search LibriVox for free public domain audiobooks.
-    """
     query = request.GET.get('q', '').strip()
     page = request.GET.get('page', '1')
 
@@ -232,7 +235,7 @@ def api_search_audiobooks(request):
         req = urllib.request.Request(url, headers={'User-Agent': 'ReadPulse/1.0'})
         with urllib.request.urlopen(req, timeout=10) as resp:
             data = json.loads(resp.read().decode('utf-8'))
-    except urllib.error.HTTPError as e:
+    except urllib.error.HTTPError:
         return JsonResponse({'audiobooks': [], 'total_results': 0, 'page': page})
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -241,8 +244,6 @@ def api_search_audiobooks(request):
     audiobooks = []
 
     for ab in books_raw:
-        cover = ab.get('url_zip_file', '')
-
         authors_list = ab.get('authors', []) or []
         author_names = ', '.join(
             f"{a.get('first_name', '')} {a.get('last_name', '')}".strip()
@@ -274,17 +275,21 @@ def api_search_audiobooks(request):
     })
 
 
+# ─────────────────────────────────────────────
+# RESTful API  –  Favorites
+# ─────────────────────────────────────────────
+
+@login_required
 @require_http_methods(["GET"])
 def api_list_favorites(request):
-    """GET /api/favorites/ – return all saved favorites."""
-    favorites = FavoriteBook.objects.all()
+    favorites = FavoriteBook.objects.filter(user=request.user)
     return JsonResponse({'favorites': [f.to_dict() for f in favorites]})
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_add_favorite(request):
-    """POST /api/favorites/add/ – save a book to favorites."""
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
@@ -295,6 +300,7 @@ def api_add_favorite(request):
         return JsonResponse({'error': '"google_books_id" is required.'}, status=400)
 
     book, created = FavoriteBook.objects.get_or_create(
+        user=request.user,
         google_books_id=google_books_id,
         defaults={
             'title': payload.get('title', ''),
@@ -315,531 +321,272 @@ def api_add_favorite(request):
     }, status=status_code)
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["DELETE"])
 def api_remove_favorite(request, google_books_id):
-    """DELETE /api/favorites/<google_books_id>/remove/ – remove a book from favorites."""
     try:
-        book = FavoriteBook.objects.get(google_books_id=google_books_id)
+        book = FavoriteBook.objects.get(user=request.user, google_books_id=google_books_id)
     except FavoriteBook.DoesNotExist:
         return JsonResponse({'error': 'Book not found in favorites.'}, status=404)
     book.delete()
     return JsonResponse({'message': 'Removed from favorites.'}, status=200)
 
 
+@login_required
 @require_http_methods(["GET"])
 def api_favorite_detail(request, google_books_id):
-    """GET /api/favorites/<google_books_id>/ – check if a book is a favorite."""
     try:
-        book = FavoriteBook.objects.get(google_books_id=google_books_id)
+        book = FavoriteBook.objects.get(user=request.user, google_books_id=google_books_id)
         return JsonResponse({'is_favorite': True, 'book': book.to_dict()})
     except FavoriteBook.DoesNotExist:
         return JsonResponse({'is_favorite': False})
 
 
 # ─────────────────────────────────────────────
-# Community Books – Page views
+# RESTful API  –  Community Books
 # ─────────────────────────────────────────────
-
-
 
 @login_required
-def community_page(request):
-    """Render the Community Books listing page."""
-    fav_count = FavoriteBook.objects.count()
-    return render(request, 'books/community.html', {'fav_count': fav_count})
-
-
-@login_required
-def community_book_detail_page(request, book_id):
-    """Render a single community book's detail page."""
-    book = get_object_or_404(CommunityBook, id=book_id)
-    fav_count = FavoriteBook.objects.count()
-    return render(request, 'books/community_detail.html', {
-        'book': book,
-        'fav_count': fav_count,
-    })
-
-
-# ─────────────────────────────────────────────
-# Community Books – API
-# ─────────────────────────────────────────────
-
 @require_http_methods(["GET"])
-def api_list_community_books(request):
-    """GET /api/community/ – list all community books."""
-    q = request.GET.get('q', '').strip()
-    qs = CommunityBook.objects.all()
-    if q:
-        from django.db.models import Q
-        qs = qs.filter(Q(title__icontains=q) | Q(authors__icontains=q) | Q(location__icontains=q))
-    books = [b.to_dict() for b in qs]
+def api_community_books(request):
+    """GET /api/community/ – list all available community books (excluding own)."""
+    listing_type = request.GET.get('type', '')
+    search = request.GET.get('q', '').strip()
+
+    qs = CommunityBook.objects.filter(status='available').select_related('owner')
+    if listing_type in ('borrow', 'swap'):
+        qs = qs.filter(Q(listing_type=listing_type) | Q(listing_type='both'))
+    if search:
+        qs = qs.filter(Q(title__icontains=search) | Q(authors__icontains=search) | Q(categories__icontains=search))
+
+    books = [b.to_dict(request_user=request.user) for b in qs]
     return JsonResponse({'books': books, 'total': len(books)})
 
 
+@login_required
 @csrf_exempt
 @require_http_methods(["POST"])
 def api_add_community_book(request):
-    """POST /api/community/add/ – list a new community book."""
+    """POST /api/community/add/ – list a book in community."""
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
 
-    required = ['title', 'owner_name']
-    for field in required:
-        if not payload.get(field, '').strip():
-            return JsonResponse({'error': f'"{field}" is required.'}, status=400)
+    title = payload.get('title', '').strip()
+    if not title:
+        return JsonResponse({'error': '"title" is required.'}, status=400)
+
+    listing_type = payload.get('listing_type', 'borrow')
+    if listing_type not in ('borrow', 'swap', 'both'):
+        listing_type = 'borrow'
 
     book = CommunityBook.objects.create(
-        title=payload['title'].strip(),
-        authors=payload.get('authors', '').strip(),
-        description=payload.get('description', '').strip(),
-        thumbnail=payload.get('thumbnail', '').strip(),
-        published_date=payload.get('published_date', '').strip(),
-        categories=payload.get('categories', '').strip(),
-        google_books_id=payload.get('google_books_id', '').strip(),
-        owner_name=payload['owner_name'].strip(),
-        owner_contact=payload.get('owner_contact', '').strip(),
-        location=payload.get('location', '').strip(),
-        condition=payload.get('condition', 'good'),
-        notes=payload.get('notes', '').strip(),
-        listing_type=payload.get('listing_type', 'borrow'),
+        owner=request.user,
+        title=title,
+        authors=payload.get('authors', ''),
+        description=payload.get('description', ''),
+        thumbnail=payload.get('thumbnail', ''),
+        published_date=payload.get('published_date', ''),
+        page_count=payload.get('page_count'),
+        categories=payload.get('categories', ''),
+        isbn=payload.get('isbn', ''),
+        publisher=payload.get('publisher', ''),
+        language=payload.get('language', ''),
+        google_books_id=payload.get('google_books_id', ''),
+        listing_type=listing_type,
+        condition=payload.get('condition', 'Good'),
+        notes=payload.get('notes', ''),
+        contact_info=payload.get('contact_info', ''),
+        location=payload.get('location', ''),
     )
-    return JsonResponse({'message': 'Book listed successfully!', 'book': book.to_dict()}, status=201)
+    return JsonResponse({'message': 'Book listed successfully.', 'book': book.to_dict(request_user=request.user)}, status=201)
 
 
-@require_http_methods(["GET"])
+@login_required
+@csrf_exempt
+@require_http_methods(["PATCH", "DELETE"])
 def api_community_book_detail(request, book_id):
-    """GET /api/community/<id>/ – fetch a single community book with its requests."""
-    try:
-        book = CommunityBook.objects.get(id=book_id)
-    except CommunityBook.DoesNotExist:
-        return JsonResponse({'error': 'Book not found.'}, status=404)
-    data = book.to_dict()
-    data['borrow_requests'] = [r.to_dict() for r in book.borrow_requests.all()]
-    return JsonResponse({'book': data})
+    """PATCH or DELETE /api/community/<id>/ – update or remove own listing."""
+    book = get_object_or_404(CommunityBook, id=book_id, owner=request.user)
 
+    if request.method == 'DELETE':
+        book.delete()
+        return JsonResponse({'message': 'Listing removed.'})
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_request_borrow(request, book_id):
-    """POST /api/community/<id>/borrow/ – submit a borrow/swap request."""
-    try:
-        book = CommunityBook.objects.get(id=book_id)
-    except CommunityBook.DoesNotExist:
-        return JsonResponse({'error': 'Book not found.'}, status=404)
-
-    if not book.is_available:
-        return JsonResponse({'error': 'This book is not available for borrowing right now.'}, status=400)
-
+    # PATCH
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
 
-    required = ['requester_name', 'requester_contact']
-    for field in required:
-        if not payload.get(field, '').strip():
-            return JsonResponse({'error': f'"{field}" is required.'}, status=400)
-
-    # Validate that request_type matches what the listing allows
-    request_type = payload.get('request_type', 'borrow')
-    valid_types = [t[0] for t in BorrowRequest.REQUEST_TYPE_CHOICES]
-    if request_type not in valid_types:
-        return JsonResponse({'error': f'Invalid request_type. Choose from: {", ".join(valid_types)}'}, status=400)
-
-    if book.listing_type != 'both' and request_type != book.listing_type:
-        return JsonResponse(
-            {'error': f'This book is only available for "{book.listing_type}". Cannot request "{request_type}".'},
-            status=400
-        )
-
-    # Parse meetup_datetime safely — HTML datetime-local sends "YYYY-MM-DDTHH:MM"
-    # (no seconds), which Django's DateTimeField rejects. Normalise it here.
-    meetup_datetime = None
-    raw_dt = payload.get('meetup_datetime') or ''
-    if raw_dt.strip():
-        from django.utils.dateparse import parse_datetime
-        # Append seconds if missing (e.g. "2026-03-06T05:16" → "2026-03-06T05:16:00")
-        if raw_dt.count(':') == 1:
-            raw_dt = raw_dt + ':00'
-        meetup_datetime = parse_datetime(raw_dt)
-        if meetup_datetime is None:
-            return JsonResponse({'error': 'Invalid meetup_datetime format. Use YYYY-MM-DDTHH:MM.'}, status=400)
-
-    borrow = BorrowRequest.objects.create(
-        book=book,
-        requester_name=payload['requester_name'].strip(),
-        requester_contact=payload['requester_contact'].strip(),
-        message=payload.get('message', '').strip(),
-        meetup_datetime=meetup_datetime,
-        request_type=request_type,
-    )
-    # Notify the book owner about the new request
-    if book.owner_user_id:
-        Notification.objects.create(
-            recipient_id=book.owner_user_id,
-            notif_type="new_request",
-            title=f"New {borrow.get_request_type_display()} Request",
-            body=f"{borrow.requester_name} requested to {borrow.request_type} your book \"{book.title}\".",
-            borrow_request=borrow,
-        )
-
-    return JsonResponse({"message": "Request submitted!", "request": borrow.to_dict()}, status=201)
-
-
-@csrf_exempt
-@require_http_methods(["PATCH"])
-def api_update_borrow_status(request, request_id):
-    """PATCH /api/community/requests/<id>/status/ – update borrow request status."""
-    try:
-        borrow = BorrowRequest.objects.get(id=request_id)
-    except BorrowRequest.DoesNotExist:
-        return JsonResponse({'error': 'Request not found.'}, status=404)
-
-    try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
-
-    new_status = payload.get('status', '').strip()
-    valid = [s[0] for s in BorrowRequest.STATUS_CHOICES]
-    if new_status not in valid:
-        return JsonResponse({'error': f'Invalid status. Choose from: {", ".join(valid)}'}, status=400)
-
-    borrow.status = new_status
-    borrow.save()
-
-    # Mark book unavailable when approved, available again when returned/declined
-    if new_status == 'approved':
-        borrow.book.is_available = False
-        borrow.book.save()
-    elif new_status in ('returned', 'declined'):
-        borrow.book.is_available = True
-        borrow.book.save()
-
-    # Notify the requester about the status change
-    if borrow.requester_user_id and new_status in ("approved", "declined", "returned"):
-        notif_map = {
-            "approved":  ("request_approved",  "Request Approved",  f"Your request to borrow \"{borrow.book.title}\" has been approved!"),
-            "declined":  ("request_declined",  "Request Declined",  f"Your request to borrow \"{borrow.book.title}\" was declined."),
-            "returned":  ("request_returned",  "Book Returned",     f"\"{borrow.book.title}\" has been marked as returned. Thanks!"),
-        }
-        ntype, ntitle, nbody = notif_map[new_status]
-        Notification.objects.create(
-            recipient_id=borrow.requester_user_id,
-            notif_type=ntype,
-            title=ntitle,
-            body=nbody,
-            borrow_request=borrow,
-        )
-
-    return JsonResponse({"message": "Status updated.", "request": borrow.to_dict()})
-
-
-@login_required
-def my_books_page(request):
-    """Render the My Books page."""
-    fav_count = FavoriteBook.objects.count()
-    return render(request, 'books/my_books.html', {'fav_count': fav_count})
-
-
-@login_required
-def my_requests_page(request):
-    """Render the My Requests page."""
-    fav_count = FavoriteBook.objects.count()
-    return render(request, 'books/my_requests.html', {'fav_count': fav_count})
-
-
-@login_required
-def requests_page(request):
-    """Render the All Requests page."""
-    fav_count = FavoriteBook.objects.count()
-    return render(request, 'books/requests.html', {'fav_count': fav_count})
-
-
-@csrf_exempt
-@require_http_methods(["PATCH"])
-def api_update_community_book(request, book_id):
-    """PATCH /api/community/<id>/update/ – update a community book's details."""
-    try:
-        book = CommunityBook.objects.get(id=book_id)
-    except CommunityBook.DoesNotExist:
-        return JsonResponse({'error': 'Book not found.'}, status=404)
-
-    try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
-
-    # listing_type added so owner can change borrow/return/both
-    updatable = ['title', 'authors', 'description', 'condition', 'notes',
-                 'location', 'owner_contact', 'is_available', 'listing_type']
-    for field in updatable:
+    for field in ('title', 'authors', 'isbn', 'published_date', 'description',
+                  'categories', 'publisher', 'language', 'google_books_id',
+                  'listing_type', 'condition', 'notes', 'status',
+                  'contact_info', 'location'):
         if field in payload:
-            val = payload[field]
-            if isinstance(val, str):
-                val = val.strip()
-            # Validate listing_type
-            if field == 'listing_type':
-                valid_listing = [t[0] for t in CommunityBook.LISTING_TYPE_CHOICES]
-                if val not in valid_listing:
-                    return JsonResponse({'error': f'Invalid listing_type. Choose from: {", ".join(valid_listing)}'}, status=400)
-            setattr(book, field, val)
-
-    if not book.title:
-        return JsonResponse({'error': '"title" cannot be empty.'}, status=400)
-
+            setattr(book, field, payload[field])
+    # thumbnail — allow update
+    if 'thumbnail' in payload:
+        book.thumbnail = payload['thumbnail']
+    if 'page_count' in payload:
+        book.page_count = payload['page_count'] or None
+        if field in payload:
+            setattr(book, field, payload[field])
     book.save()
-    return JsonResponse({'message': 'Book updated successfully!', 'book': book.to_dict()})
+    return JsonResponse({'message': 'Listing updated.', 'book': book.to_dict(request_user=request.user)})
 
 
+@login_required
+@require_http_methods(["GET"])
+def api_my_listings(request):
+    """GET /api/community/my-listings/ – current user's listed books."""
+    books = CommunityBook.objects.filter(owner=request.user).select_related('owner')
+    return JsonResponse({'books': [b.to_dict(request_user=request.user) for b in books]})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_my_available_listings(request):
+    """GET /api/community/my-available-listings/ – own books available (for swap picker)."""
+    books = CommunityBook.objects.filter(owner=request.user, status='available').select_related('owner')
+    return JsonResponse({'books': [b.to_dict(request_user=request.user) for b in books]})
+
+
+# ─────────────────────────────────────────────
+# RESTful API  –  Book Requests
+# ─────────────────────────────────────────────
+
+@login_required
 @csrf_exempt
-@require_http_methods(["DELETE"])
-def api_delete_community_book(request, book_id):
-    """DELETE /api/community/<id>/delete/ – remove a community book listing."""
+@require_http_methods(["POST"])
+def api_create_request(request):
+    """POST /api/requests/create/ – send a borrow/swap request."""
     try:
-        book = CommunityBook.objects.get(id=book_id)
-    except CommunityBook.DoesNotExist:
-        return JsonResponse({'error': 'Book not found.'}, status=404)
-    book.delete()
-    return JsonResponse({'message': 'Book listing deleted.'}, status=200)
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    book_id = payload.get('book_id')
+    request_type = payload.get('request_type', 'borrow')
+
+    if not book_id:
+        return JsonResponse({'error': '"book_id" is required.'}, status=400)
+    if request_type not in ('borrow', 'swap'):
+        return JsonResponse({'error': 'Invalid request_type.'}, status=400)
+
+    community_book = get_object_or_404(CommunityBook, id=book_id, status='available')
+
+    if community_book.owner == request.user:
+        return JsonResponse({'error': 'You cannot request your own book.'}, status=400)
+
+    # Check listing type allows this request type
+    if community_book.listing_type not in (request_type, 'both'):
+        return JsonResponse({'error': f'This book is not available for {request_type}.'}, status=400)
+
+    book_request, created = BookRequest.objects.get_or_create(
+        community_book=community_book,
+        requester=request.user,
+        request_type=request_type,
+        defaults={
+            'message': payload.get('message', ''),
+            'status': 'pending',
+            'meetup_datetime': payload.get('meetup_datetime', ''),
+            'meetup_location': payload.get('meetup_location', ''),
+            'swap_book_title': payload.get('swap_book_title', '') if request_type == 'swap' else '',
+            'swap_book_authors': payload.get('swap_book_authors', '') if request_type == 'swap' else '',
+            'swap_book_thumbnail': payload.get('swap_book_thumbnail', '') if request_type == 'swap' else '',
+            'swap_book_condition': payload.get('swap_book_condition', 'Good') if request_type == 'swap' else '',
+            'swap_book_description': payload.get('swap_book_description', '') if request_type == 'swap' else '',
+            'swap_book_google_id': payload.get('swap_book_google_id', '') if request_type == 'swap' else '',
+        },
+    )
+
+    if not created:
+        if book_request.status in ('cancelled', 'declined'):
+            book_request.status = 'pending'
+            book_request.message = payload.get('message', book_request.message)
+            book_request.meetup_datetime = payload.get('meetup_datetime', book_request.meetup_datetime)
+            book_request.meetup_location = payload.get('meetup_location', book_request.meetup_location)
+            if request_type == 'swap':
+                book_request.swap_book_title = payload.get('swap_book_title', book_request.swap_book_title)
+                book_request.swap_book_authors = payload.get('swap_book_authors', book_request.swap_book_authors)
+                book_request.swap_book_thumbnail = payload.get('swap_book_thumbnail', book_request.swap_book_thumbnail)
+                book_request.swap_book_condition = payload.get('swap_book_condition', book_request.swap_book_condition)
+                book_request.swap_book_description = payload.get('swap_book_description', book_request.swap_book_description)
+                book_request.swap_book_google_id = payload.get('swap_book_google_id', book_request.swap_book_google_id)
+            book_request.save()
+            return JsonResponse({'message': 'Request re-sent.', 'request': book_request.to_dict()}, status=200)
+        return JsonResponse({'message': 'Request already exists.', 'request': book_request.to_dict()}, status=200)
+
+    return JsonResponse({'message': 'Request sent successfully.', 'request': book_request.to_dict()}, status=201)
 
 
+@login_required
+@require_http_methods(["GET"])
+def api_my_requests(request):
+    """GET /api/requests/mine/ – requests made by current user."""
+    requests_qs = BookRequest.objects.filter(requester=request.user).select_related('community_book', 'community_book__owner', 'requester')
+    return JsonResponse({'requests': [r.to_dict('requester') for r in requests_qs]})
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_requests_for_me(request):
+    """GET /api/requests/for-me/ – requests on current user's listings."""
+    requests_qs = BookRequest.objects.filter(community_book__owner=request.user).select_related('community_book', 'community_book__owner', 'requester')
+    return JsonResponse({'requests': [r.to_dict('owner') for r in requests_qs]})
+
+
+@login_required
 @csrf_exempt
 @require_http_methods(["PATCH"])
-def api_edit_borrow_request(request, request_id):
-    """PATCH /api/community/requests/<id>/edit/ – requester edits their own borrow request (only if still pending)."""
-    try:
-        borrow = BorrowRequest.objects.get(id=request_id)
-    except BorrowRequest.DoesNotExist:
-        return JsonResponse({'error': 'Request not found.'}, status=404)
-
-    if borrow.status != 'pending':
-        return JsonResponse({'error': 'Only pending requests can be edited.'}, status=400)
-
+def api_update_request(request, request_id):
+    """PATCH /api/requests/<id>/ – update status of a request."""
     try:
         payload = json.loads(request.body)
     except json.JSONDecodeError:
         return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
 
-    editable = ['requester_name', 'requester_contact', 'message', 'request_type']
-    for field in editable:
-        if field in payload:
-            val = payload[field]
-            if isinstance(val, str):
-                val = val.strip()
-            setattr(borrow, field, val)
+    new_status = payload.get('status', '')
 
-    # Handle meetup_datetime separately — datetime-local sends "YYYY-MM-DDTHH:MM" (no seconds)
-    if 'meetup_datetime' in payload:
-        raw_dt = payload['meetup_datetime'] or ''
-        if not raw_dt.strip():
-            borrow.meetup_datetime = None
-        else:
-            from django.utils.dateparse import parse_datetime
-            if raw_dt.count(':') == 1:
-                raw_dt = raw_dt + ':00'
-            parsed = parse_datetime(raw_dt)
-            if parsed is None:
-                return JsonResponse({'error': 'Invalid meetup_datetime format. Use YYYY-MM-DDTHH:MM.'}, status=400)
-            borrow.meetup_datetime = parsed
-
-    borrow.save()
-    return JsonResponse({'message': 'Request updated.', 'request': borrow.to_dict()})
-
-
-@csrf_exempt
-@require_http_methods(["DELETE"])
-def api_cancel_borrow_request(request, request_id):
-    """DELETE /api/community/requests/<id>/cancel/ – requester cancels their own borrow request (only if still pending)."""
+    # Determine who is acting
     try:
-        borrow = BorrowRequest.objects.get(id=request_id)
-    except BorrowRequest.DoesNotExist:
+        book_request = BookRequest.objects.select_related('community_book', 'community_book__owner', 'requester').get(id=request_id)
+    except BookRequest.DoesNotExist:
         return JsonResponse({'error': 'Request not found.'}, status=404)
 
-    if borrow.status != 'pending':
-        return JsonResponse({'error': 'Only pending requests can be cancelled.'}, status=400)
+    is_owner = book_request.community_book.owner == request.user
+    is_requester = book_request.requester == request.user
 
-    borrow.delete()
-    return JsonResponse({'message': 'Request cancelled.'}, status=200)
+    if not is_owner and not is_requester:
+        return JsonResponse({'error': 'Permission denied.'}, status=403)
 
+    # Owner can accept, decline, complete
+    if is_owner and new_status in ('accepted', 'declined', 'completed'):
+        book_request.status = new_status
+        if new_status == 'accepted':
+            # Mark book as borrowed/swapped
+            book_request.community_book.status = 'borrowed' if book_request.request_type == 'borrow' else 'swapped'
+            book_request.community_book.save()
+        book_request.save()
+        return JsonResponse({'message': f'Request {new_status}.', 'request': book_request.to_dict()})
 
-@require_http_methods(["GET"])
-def api_get_borrow_request(request, request_id):
-    """GET /api/community/requests/<id>/ – fetch a single borrow request by ID."""
-    try:
-        borrow = BorrowRequest.objects.get(id=request_id)
-    except BorrowRequest.DoesNotExist:
-        return JsonResponse({'error': 'Request not found.'}, status=404)
-    return JsonResponse({'request': borrow.to_dict()})
+    # Requester can cancel
+    if is_requester and new_status == 'cancelled':
+        book_request.status = 'cancelled'
+        book_request.save()
+        return JsonResponse({'message': 'Request cancelled.', 'request': book_request.to_dict()})
 
+    # Requester can return a borrowed book (accepted borrow → completed + book back to available)
+    if is_requester and new_status == 'returned':
+        if book_request.request_type != 'borrow' or book_request.status != 'accepted':
+            return JsonResponse({'error': 'Only accepted borrow requests can be returned.'}, status=400)
+        book_request.status = 'completed'
+        book_request.community_book.status = 'available'
+        book_request.community_book.save()
+        book_request.save()
+        return JsonResponse({'message': 'Book returned successfully.', 'request': book_request.to_dict()})
 
-@require_http_methods(["GET"])
-def api_list_all_requests(request):
-    """GET /api/community/all-requests/ – list all borrow/swap requests with optional filters."""
-    status_filter = request.GET.get('status', '').strip()
-    type_filter   = request.GET.get('type', '').strip()
-
-    qs = BorrowRequest.objects.select_related('book').all()
-    if status_filter:
-        qs = qs.filter(status=status_filter)
-    if type_filter:
-        qs = qs.filter(request_type=type_filter)
-
-    return JsonResponse({'requests': [r.to_dict() for r in qs], 'total': qs.count()})
-
-
-# ─────────────────────────────────────────────
-# Session-backed My Books & My Requests APIs
-# ─────────────────────────────────────────────
-
-@require_http_methods(["GET"])
-def api_session_my_books(request):
-    """GET /api/session/my-books/ – return IDs for the current user.
-    If logged in, queries the DB so listed books survive logout/login."""
-    if request.user.is_authenticated:
-        ids = list(CommunityBook.objects.filter(
-            owner_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_books', [])
-    return JsonResponse({'ids': ids})
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_session_add_my_book(request):
-    """POST /api/session/my-books/ – record that this user owns a book."""
-    try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
-    book_id = payload.get('id')
-    if book_id is None:
-        return JsonResponse({'error': '"id" is required.'}, status=400)
-
-    if request.user.is_authenticated:
-        CommunityBook.objects.filter(id=book_id).update(owner_user=request.user)
-        ids = list(CommunityBook.objects.filter(
-            owner_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_books', [])
-        if book_id not in ids:
-            ids.append(book_id)
-            request.session['readpulse_my_books'] = ids
-            request.session.modified = True
-    return JsonResponse({'ids': ids})
-
-
-@csrf_exempt
-@require_http_methods(["DELETE"])
-def api_session_remove_my_book(request, book_id):
-    """DELETE /api/session/my-books/<id>/ – disown a book."""
-    if request.user.is_authenticated:
-        CommunityBook.objects.filter(
-            id=book_id, owner_user=request.user
-        ).update(owner_user=None)
-        ids = list(CommunityBook.objects.filter(
-            owner_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_books', [])
-        ids = [i for i in ids if i != book_id]
-        request.session['readpulse_my_books'] = ids
-        request.session.modified = True
-    return JsonResponse({'ids': ids})
-
-
-@require_http_methods(["GET"])
-def api_session_my_requests(request):
-    """GET /api/session/my-requests/ – return request IDs for the current user.
-    If logged in, queries the DB so requests survive logout/login.
-    Falls back to session for anonymous users."""
-    if request.user.is_authenticated:
-        ids = list(BorrowRequest.objects.filter(
-            requester_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_requests', [])
-    return JsonResponse({'ids': ids})
-
-
-@csrf_exempt
-@require_http_methods(["POST"])
-def api_session_add_my_request(request):
-    """POST /api/session/my-requests/ – record that this user owns a request."""
-    try:
-        payload = json.loads(request.body)
-    except json.JSONDecodeError:
-        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
-    req_id = payload.get('id')
-    if req_id is None:
-        return JsonResponse({'error': '"id" is required.'}, status=400)
-
-    if request.user.is_authenticated:
-        # Link the request to the user in the DB
-        BorrowRequest.objects.filter(id=req_id).update(requester_user=request.user)
-        ids = list(BorrowRequest.objects.filter(
-            requester_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_requests', [])
-        if req_id not in ids:
-            ids.append(req_id)
-            request.session['readpulse_my_requests'] = ids
-            request.session.modified = True
-    return JsonResponse({'ids': ids})
-
-
-@csrf_exempt
-@require_http_methods(["DELETE"])
-def api_session_remove_my_request(request, request_id):
-    """DELETE /api/session/my-requests/<id>/ – disown a request."""
-    if request.user.is_authenticated:
-        BorrowRequest.objects.filter(
-            id=request_id, requester_user=request.user
-        ).update(requester_user=None)
-        ids = list(BorrowRequest.objects.filter(
-            requester_user=request.user
-        ).values_list('id', flat=True))
-    else:
-        ids = request.session.get('readpulse_my_requests', [])
-        ids = [i for i in ids if i != request_id]
-        request.session['readpulse_my_requests'] = ids
-        request.session.modified = True
-    return JsonResponse({'ids': ids})
-
-# ─────────────────────────────────────────────
-# Notifications API
-# ─────────────────────────────────────────────
-
-@login_required
-@require_http_methods(["GET"])
-def api_notifications(request):
-    """GET /api/notifications/ – list notifications for the logged-in user."""
-    notifs = Notification.objects.filter(recipient=request.user)
-    return JsonResponse({
-        'notifications': [n.to_dict() for n in notifs],
-        'unread_count': notifs.filter(is_read=False).count(),
-    })
-
-
-@csrf_exempt
-@login_required
-@require_http_methods(["POST"])
-def api_notifications_mark_read(request):
-    """POST /api/notifications/mark-read/ – mark all (or specific) notifications as read."""
-    try:
-        payload = json.loads(request.body) if request.body else {}
-    except json.JSONDecodeError:
-        payload = {}
-
-    ids = payload.get('ids')  # optional list of IDs; omit to mark all
-    qs = Notification.objects.filter(recipient=request.user, is_read=False)
-    if ids:
-        qs = qs.filter(id__in=ids)
-    updated = qs.update(is_read=True)
-    return JsonResponse({'marked_read': updated})
+    return JsonResponse({'error': 'Invalid status transition.'}, status=400)

@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
                 ('title', models.CharField(max_length=500)),
                 ('authors', models.CharField(blank=True, default='', max_length=500)),
                 ('description', models.TextField(blank=True, default='')),
-                ('thumbnail', models.URLField(blank=True, default='', max_length=1000)),
+                ('thumbnail', models.TextField(blank=True, default='')),
                 ('published_date', models.CharField(blank=True, default='', max_length=50)),
                 ('page_count', models.IntegerField(blank=True, null=True)),
                 ('categories', models.CharField(blank=True, default='', max_length=500)),

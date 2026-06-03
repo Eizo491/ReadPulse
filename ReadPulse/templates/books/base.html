@@ -23,7 +23,7 @@
   </div>
 
   <nav class="sidebar-nav">
-    <div class="nav-label">Menu</div>
+    <div class="nav-label">Discover</div>
 
     <a href="/" class="nav-item {% if request.resolver_match.url_name == 'search' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -42,73 +42,54 @@
       {% endif %}
     </a>
 
-    <a href="/community/" class="nav-item {% if request.resolver_match.url_name == 'community' or request.resolver_match.url_name == 'community_book_detail' %}active{% endif %}">
+    <div class="nav-label" style="margin-top:18px;">Community</div>
+
+    <a href="/community/" class="nav-item {% if request.resolver_match.url_name == 'community' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
         <circle cx="9" cy="7" r="4"/>
         <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
         <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
       </svg>
-      Community Books
+      Browse Books
     </a>
 
-    <a href="/my-books/" class="nav-item {% if request.resolver_match.url_name == 'my_books' %}active{% endif %}" id="nav-my-books">
+    <a href="/my-listings/" class="nav-item {% if request.resolver_match.url_name == 'my_listings' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-        <line x1="12" y1="8" x2="12" y2="14"/>
-        <line x1="9" y1="11" x2="15" y2="11"/>
+        <rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/>
+        <rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>
       </svg>
-      My Listed Books
-      <span class="my-books-badge" id="my-books-badge" style="display:none"></span>
-    </a>
-
-    <a href="/my-requests/" class="nav-item {% if request.resolver_match.url_name == 'my_requests' %}active{% endif %}" id="nav-my-requests">
-      <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-      </svg>
-      My Requests
-      <span class="my-requests-badge" id="my-requests-badge" style="display:none"></span>
+      My Listings
     </a>
 
     <a href="/requests/" class="nav-item {% if request.resolver_match.url_name == 'requests' %}active{% endif %}">
       <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-        <polyline points="14 2 14 8 20 8"/>
-        <line x1="16" y1="13" x2="8" y2="13"/>
-        <line x1="16" y1="17" x2="8" y2="17"/>
-        <polyline points="10 9 9 9 8 9"/>
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
       </svg>
-      Book Requests
-      <span class="requests-badge" id="requests-badge" style="display:none"></span>
+      Requests
     </a>
   </nav>
 
   <div class="sidebar-footer">
     {% if user.is_authenticated %}
-      <!-- Notification Bell -->
-      <div class="notif-wrap" id="notif-wrap">
-        <button class="notif-bell" id="notif-bell" aria-label="Notifications">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-          </svg>
-          <span class="notif-badge" id="notif-badge" style="display:none"></span>
-        </button>
-        <div class="notif-dropdown" id="notif-dropdown" style="display:none">
-          <div class="notif-header">
-            <span>Notifications</span>
-            <button class="notif-mark-all" id="notif-mark-all">Mark all read</button>
-          </div>
-          <ul class="notif-list" id="notif-list">
-            <li class="notif-empty">No notifications yet.</li>
-          </ul>
+      <div class="sidebar-user">
+        <div class="sidebar-user-avatar">{{ user.username|slice:":1"|upper }}</div>
+        <div class="sidebar-user-info">
+          <div class="sidebar-user-name">{{ user.get_full_name|default:user.username }}</div>
+          <div class="sidebar-user-sub">@{{ user.username }}</div>
         </div>
       </div>
-      <a href="{% url 'account_logout' %}" class="nav-item">Logout</a>
+      <a href="{% url 'account_logout' %}" class="nav-item logout-link">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+          <polyline points="16 17 21 12 16 7"/>
+          <line x1="21" y1="12" x2="9" y2="12"/>
+        </svg>
+        Logout
+      </a>
     {% else %}
       <a href="{% url 'account_login' %}" class="nav-item">Login</a>
     {% endif %}
-    <div style="margin-top:10px;">Powered by Google Books API</div>
   </div>
 </aside>
 
@@ -117,214 +98,11 @@
   {% block content %}{% endblock %}
 </main>
 
+<!-- Modals (outside main so they stack above the fixed sidebar) -->
+{% block modals %}{% endblock %}
+
 <!-- Toast container -->
 <div class="toast-container" id="toast-container"></div>
-
-<style>
-/* ── Notification Bell ── */
-.notif-wrap {
-  position: relative;
-  margin-bottom: 8px;
-}
-.notif-bell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 12px;
-  background: none;
-  border: none;
-  border-radius: var(--radius-sm, 8px);
-  color: var(--text-secondary);
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: background 0.15s, color 0.15s;
-  position: relative;
-}
-.notif-bell:hover { background: var(--surface-hover, #f5ede8); color: var(--accent); }
-.notif-badge {
-  position: absolute;
-  top: 6px; right: 10px;
-  background: var(--accent, #c4704f);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.65rem;
-  font-weight: 700;
-  min-width: 17px;
-  height: 17px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 4px;
-}
-.notif-dropdown {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
-  width: 300px;
-  background: var(--surface, #fff);
-  border: 1px solid var(--border, #e8ddd8);
-  border-radius: var(--radius, 12px);
-  box-shadow: 0 8px 28px rgba(0,0,0,0.13);
-  z-index: 999;
-  overflow: hidden;
-}
-.notif-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px 14px 10px;
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  border-bottom: 1px solid var(--border, #e8ddd8);
-}
-.notif-mark-all {
-  background: none;
-  border: none;
-  font-size: 0.75rem;
-  color: var(--accent, #c4704f);
-  cursor: pointer;
-  font-weight: 600;
-  padding: 0;
-}
-.notif-mark-all:hover { text-decoration: underline; }
-.notif-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  max-height: 320px;
-  overflow-y: auto;
-}
-.notif-item {
-  padding: 11px 14px;
-  border-bottom: 1px solid var(--border-light, #f0e8e3);
-  cursor: default;
-  transition: background 0.12s;
-}
-.notif-item:last-child { border-bottom: none; }
-.notif-item.unread { background: var(--accent-light, #fdf2ec); }
-.notif-item:hover { background: var(--surface-hover, #f5ede8); }
-.notif-item-title {
-  font-size: 0.82rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-bottom: 2px;
-}
-.notif-item-body {
-  font-size: 0.78rem;
-  color: var(--text-secondary);
-  line-height: 1.4;
-}
-.notif-item-time {
-  font-size: 0.7rem;
-  color: var(--text-muted);
-  margin-top: 3px;
-}
-.notif-empty {
-  padding: 18px 14px;
-  font-size: 0.82rem;
-  color: var(--text-muted);
-  text-align: center;
-}
-</style>
-
-<script>
-(function() {
-  // Show My Books badge count from session API
-  fetch('/api/session/my-books/')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var ids = d.ids || [];
-      var badge = document.getElementById('my-books-badge');
-      if (badge && ids.length > 0) { badge.textContent = ids.length; badge.style.display = ''; }
-    }).catch(function(){});
-
-  // Show My Requests badge count from session API
-  fetch('/api/session/my-requests/')
-    .then(function(r){ return r.json(); })
-    .then(function(d){
-      var rids = d.ids || [];
-      var rbadge = document.getElementById('my-requests-badge');
-      if (rbadge && rids.length > 0) { rbadge.textContent = rids.length; rbadge.style.display = ''; }
-    }).catch(function(){});
-
-  // ── Notifications ──
-  {% if user.is_authenticated %}
-  var notifBell     = document.getElementById('notif-bell');
-  var notifDropdown = document.getElementById('notif-dropdown');
-  var notifBadge    = document.getElementById('notif-badge');
-  var notifList     = document.getElementById('notif-list');
-  var markAllBtn    = document.getElementById('notif-mark-all');
-  var notifOpen     = false;
-
-  function timeAgo(isoStr) {
-    var diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
-    if (diff < 60)   return 'just now';
-    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
-    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
-    return Math.floor(diff/86400) + 'd ago';
-  }
-
-  function renderNotifications(data) {
-    var notifs = data.notifications || [];
-    var unread = data.unread_count || 0;
-
-    if (unread > 0) {
-      notifBadge.textContent = unread > 99 ? '99+' : unread;
-      notifBadge.style.display = 'flex';
-    } else {
-      notifBadge.style.display = 'none';
-    }
-
-    if (notifs.length === 0) {
-      notifList.innerHTML = '<li class="notif-empty">No notifications yet.</li>';
-      return;
-    }
-
-    notifList.innerHTML = notifs.map(function(n) {
-      return '<li class="notif-item ' + (n.is_read ? '' : 'unread') + '" data-id="' + n.id + '">' +
-        '<div class="notif-item-title">' + n.title + '</div>' +
-        '<div class="notif-item-body">' + n.body + '</div>' +
-        '<div class="notif-item-time">' + timeAgo(n.created_at) + '</div>' +
-      '</li>';
-    }).join('');
-  }
-
-  function loadNotifications() {
-    fetch('/api/notifications/')
-      .then(function(r) { return r.json(); })
-      .then(renderNotifications)
-      .catch(function() {});
-  }
-
-  loadNotifications();
-  setInterval(loadNotifications, 30000); // poll every 30s
-
-  notifBell.addEventListener('click', function(e) {
-    e.stopPropagation();
-    notifOpen = !notifOpen;
-    notifDropdown.style.display = notifOpen ? 'block' : 'none';
-    if (notifOpen) loadNotifications();
-  });
-
-  document.addEventListener('click', function(e) {
-    if (notifOpen && !document.getElementById('notif-wrap').contains(e.target)) {
-      notifOpen = false;
-      notifDropdown.style.display = 'none';
-    }
-  });
-
-  markAllBtn.addEventListener('click', function() {
-    fetch('/api/notifications/mark-read/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': '{{ csrf_token }}' },
-      body: JSON.stringify({}),
-    }).then(function() { loadNotifications(); }).catch(function(){});
-  });
-  {% endif %}
-})();
-</script>
 
 {% block scripts %}{% endblock %}
 </body>

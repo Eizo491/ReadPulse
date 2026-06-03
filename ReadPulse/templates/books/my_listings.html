@@ -1,0 +1,162 @@
+{% extends "books/base.html" %}
+{% load static %}
+
+{% block title %}My Listings – ReadPulse{% endblock %}
+
+{% block content %}
+<div class="topbar">
+  <div>
+    <div class="topbar-title">My Listings</div>
+    <div class="topbar-subtitle">Books you've listed in the community</div>
+  </div>
+  <div class="topbar-actions">
+    <a href="/community/" class="btn-ghost">Browse Community</a>
+    <a href="/community/#add" class="btn-primary" id="listing-add-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add a Book
+    </a>
+  </div>
+</div>
+
+<div class="page-content">
+  <div id="listings-area">
+    <div class="status-msg">
+      <span class="status-icon">📖</span>
+      <p>Loading your listings…</p>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Edit Listing Modal -->
+<div id="edit-modal" class="modal-overlay" hidden>
+  <div class="modal-card" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">Edit Listing</div>
+      <button class="modal-close" id="edit-modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Book cover preview + upload -->
+      <div id="edit-cover-preview" class="add-book-preview" style="margin-bottom:14px;"></div>
+
+      <!-- Book Info -->
+      <div class="form-group">
+        <label>Title <span class="required">*</span></label>
+        <input type="text" id="edit-title" placeholder="Book title">
+      </div>
+      <div class="form-group">
+        <label>Author(s)</label>
+        <input type="text" id="edit-authors" placeholder="Author name(s)">
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>ISBN</label>
+          <input type="text" id="edit-isbn" placeholder="ISBN-13">
+        </div>
+        <div class="form-group">
+          <label>Published</label>
+          <input type="text" id="edit-published" placeholder="Year">
+        </div>
+      </div>
+
+      <!-- Book Cover (URL or upload) -->
+      <div class="form-group">
+        <label>Book Cover</label>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+          <input type="text" id="edit-thumbnail-url" placeholder="Paste image URL…" style="flex:1;min-width:0;" oninput="onEditThumbnailUrlChange()">
+          <span style="color:var(--text-muted);font-size:.82rem;">or</span>
+          <label class="btn-ghost btn-sm" style="cursor:pointer;margin:0;">
+            Upload image
+            <input type="file" id="edit-cover-file" accept="image/*" style="display:none;" onchange="onEditCoverUpload(event)">
+          </label>
+        </div>
+        <span class="field-hint" style="font-size:.78rem;color:var(--text-muted);">Paste a direct image URL or upload a photo of your book cover.</span>
+        <input type="hidden" id="edit-thumbnail">
+      </div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Condition</label>
+          <select id="edit-condition">
+            <option value="Like New">Like New</option>
+            <option value="Good">Good</option>
+            <option value="Fair">Fair</option>
+            <option value="Acceptable">Acceptable</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Available for</label>
+          <select id="edit-listing-type">
+            <option value="borrow">Borrow only</option>
+            <option value="swap">Swap only</option>
+            <option value="both">Borrow or Swap</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Status</label>
+        <select id="edit-status">
+          <option value="available">Available</option>
+          <option value="borrowed">Borrowed</option>
+          <option value="swapped">Swapped</option>
+          <option value="unavailable">Unavailable</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Notes (optional)</label>
+        <textarea id="edit-notes" rows="2" placeholder="Any notes for the borrower/swapper…"></textarea>
+      </div>
+
+      <div class="form-section-divider" style="border-top:1px solid var(--border);margin:16px 0 14px;"></div>
+      <div class="form-section-label" style="font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Contact & Meetup Info</div>
+
+      <div class="form-group">
+        <label>Contact Info <span class="required">*</span></label>
+        <input type="text" id="edit-contact-info" placeholder="e.g. 09XX-XXX-XXXX, email, or Facebook name">
+        <span class="field-hint" style="font-size:.78rem;color:var(--text-muted);">How should requesters reach you to arrange the handover?</span>
+      </div>
+      <div class="form-group">
+        <label>Preferred Meetup Area (optional)</label>
+        <input type="text" id="edit-location" placeholder="e.g. SM Dasmariñas, Cavite City Hall area…">
+      </div>
+
+      <input type="hidden" id="edit-book-id">
+      <input type="hidden" id="edit-google-id">
+
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="edit-cancel-btn">Cancel</button>
+        <button type="button" class="btn-primary" id="edit-save-btn">Save Changes</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Delete Modal -->
+<div id="delete-modal" class="modal-overlay" hidden>
+  <div class="modal-card" style="max-width:380px;">
+    <div class="modal-header">
+      <div class="modal-title">Remove Listing</div>
+      <button class="modal-close" id="delete-modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary);margin-bottom:20px;">Are you sure you want to remove <strong id="delete-book-title"></strong> from your listings?</p>
+      <input type="hidden" id="delete-book-id">
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="delete-cancel-btn">Cancel</button>
+        <button type="button" class="btn-danger" id="delete-confirm-btn">Remove</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/main.js' %}"></script>
+<script src="{% static 'js/my_listings.js' %}"></script>
+{% endblock %}

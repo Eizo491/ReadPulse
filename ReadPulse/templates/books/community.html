@@ -7,173 +7,281 @@
 <div class="topbar">
   <div>
     <div class="topbar-title">Community Books</div>
-    <div class="topbar-subtitle">Books shared by readers — browse &amp; borrow in person</div>
+    <div class="topbar-subtitle">Browse, borrow or swap books from other readers</div>
   </div>
-  <button class="btn-primary" id="open-add-modal">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-      <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-    </svg>
-    Add a Book
-  </button>
+  <div class="topbar-actions">
+    <button class="btn-primary" id="add-book-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      List a Book
+    </button>
+  </div>
 </div>
 
 <div class="page-content">
-  <!-- Search bar -->
-  <div class="community-search-bar">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-    </svg>
-    <input type="text" id="community-search" placeholder="Search by title, author, or location…" autocomplete="off">
+
+  <!-- Filters -->
+  <div class="community-filter-row">
+    <div class="search-box community-search-box">
+      <input type="text" id="community-search" placeholder="Search title, author, genre…" autocomplete="off" spellcheck="false">
+      <button type="button" class="btn-search" id="community-search-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        Search
+      </button>
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-tab active" data-type="">All</button>
+      <button class="filter-tab" data-type="borrow">Borrow</button>
+      <button class="filter-tab" data-type="swap">Swap</button>
+    </div>
   </div>
 
-  <!-- Stats -->
-  <div class="community-stats" id="community-stats"></div>
-
-  <!-- Grid -->
   <div id="community-area">
-    <div class="community-grid" id="community-grid"></div>
-    <div class="status-msg" id="community-empty" style="display:none">
+    <div class="status-msg">
       <span class="status-icon">📚</span>
-      <p>No community books yet.</p>
-      <p class="status-hint">Be the first to <button class="link-btn" id="empty-add-btn">add a book</button> for others to borrow!</p>
+      <p>Loading community books…</p>
     </div>
-    <div class="status-msg" id="community-loading">
-      <span class="status-icon" style="font-size:1.5rem">⏳</span>
-      <p>Loading books…</p>
+  </div>
+</div>
+{% endblock %}
+
+{% block modals %}
+<!-- Add Book Modal -->
+<div id="add-book-modal" class="modal-overlay" hidden>
+  <div class="modal-card" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title">List a Book</div>
+      <button class="modal-close" id="add-book-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Step 1: Search Google Books -->
+      <div id="add-step-search">
+        <p class="modal-hint">Search for the book on Google Books to auto-fill details, or add it manually.</p>
+        <div class="search-box" style="margin-bottom:12px;">
+          <input type="text" id="add-search-input" placeholder="Search title or author…" autocomplete="off">
+          <button type="button" class="btn-search" id="add-search-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            Search
+          </button>
+        </div>
+        <div id="add-search-results"></div>
+        <button type="button" class="btn-ghost" id="add-manual-btn" style="margin-top:10px;">Add manually without searching</button>
+      </div>
+
+      <!-- Step 2: Book Details Form -->
+      <div id="add-step-form" hidden>
+        <div class="add-book-preview" id="add-book-preview"></div>
+
+        <div class="form-group">
+          <label>Title <span class="required">*</span></label>
+          <input type="text" id="form-title" placeholder="Book title">
+        </div>
+        <div class="form-group">
+          <label>Author(s)</label>
+          <input type="text" id="form-authors" placeholder="Author name(s)">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>ISBN</label>
+            <input type="text" id="form-isbn" placeholder="ISBN-13">
+          </div>
+          <div class="form-group">
+            <label>Published</label>
+            <input type="text" id="form-published" placeholder="Year">
+          </div>
+        </div>
+
+        <!-- Book Cover (for manual entries) -->
+        <div class="form-group" id="form-cover-group">
+          <label>Book Cover (optional)</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="text" id="form-thumbnail-url" placeholder="Paste image URL…" style="flex:1;min-width:0;" oninput="onAddThumbnailUrlChange()">
+            <span style="color:var(--text-muted);font-size:.82rem;">or</span>
+            <label class="btn-ghost btn-sm" style="cursor:pointer;margin:0;">
+              Upload image
+              <input type="file" id="form-cover-file" accept="image/*" style="display:none;" onchange="onAddCoverUpload(event)">
+            </label>
+          </div>
+          <span class="field-hint" style="font-size:.78rem;color:var(--text-muted);">Paste a direct image URL or upload a photo of your book cover.</span>
+        </div>
+        <div id="form-cover-preview" style="margin-bottom:10px;"></div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Condition</label>
+            <select id="form-condition">
+              <option value="Like New">Like New</option>
+              <option value="Good" selected>Good</option>
+              <option value="Fair">Fair</option>
+              <option value="Acceptable">Acceptable</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Available for</label>
+            <select id="form-listing-type">
+              <option value="borrow">Borrow only</option>
+              <option value="swap">Swap only</option>
+              <option value="both">Borrow or Swap</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Notes (optional)</label>
+          <textarea id="form-notes" rows="2" placeholder="Any notes for the borrower/swapper…"></textarea>
+        </div>
+
+        <div class="form-section-divider" style="border-top:1px solid var(--border);margin:16px 0 14px;"></div>
+        <div class="form-section-label" style="font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Contact & Meetup Info</div>
+
+        <div class="form-group">
+          <label>Contact Info <span class="required">*</span></label>
+          <input type="text" id="form-contact-info" placeholder="e.g. 09XX-XXX-XXXX, email, or Facebook name">
+          <span class="field-hint" style="font-size:.78rem;color:var(--text-muted);">How should requesters reach you to arrange the handover?</span>
+        </div>
+        <div class="form-group">
+          <label>Preferred Meetup Area (optional)</label>
+          <input type="text" id="form-location" placeholder="e.g. SM Dasmariñas, Cavite City Hall area…">
+          <span class="field-hint" style="font-size:.78rem;color:var(--text-muted);">General area where you're comfortable meeting up.</span>
+        </div>
+
+        <input type="hidden" id="form-thumbnail">
+        <input type="hidden" id="form-description">
+        <input type="hidden" id="form-categories">
+        <input type="hidden" id="form-page-count">
+        <input type="hidden" id="form-publisher">
+        <input type="hidden" id="form-language">
+        <input type="hidden" id="form-google-id">
+
+        <div class="modal-actions">
+          <button type="button" class="btn-ghost" id="add-back-btn">← Back</button>
+          <button type="button" class="btn-primary" id="add-submit-btn">List Book</button>
+        </div>
+      </div>
+
     </div>
   </div>
 </div>
 
-<!-- ── Add Book Modal ── -->
-<div class="modal-overlay" id="add-modal" style="display:none">
-  <div class="modal" id="add-modal-box">
+<!-- Request Modal -->
+<div id="request-modal" class="modal-overlay" hidden>
+  <div class="modal-card" style="max-width:480px;">
     <div class="modal-header">
-      <div class="modal-title">List a Book</div>
-      <button class="modal-close" id="close-add-modal" aria-label="Close">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
+      <div class="modal-title" id="request-modal-title">Send Request</div>
+      <button class="modal-close" id="request-modal-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
       </button>
     </div>
-
-    <!-- Step 1: Pick from Google Books or enter manually -->
-    <div id="step-pick" class="modal-step">
-      <p class="modal-hint">Search Google Books to auto-fill details, or enter manually.</p>
-      <div class="modal-search-wrap">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-        </svg>
-        <input type="text" id="modal-book-search" placeholder="Search for the book title…" autocomplete="off">
-        <button class="btn-sm" id="modal-search-btn">Search</button>
+    <div class="modal-body">
+      <div id="request-book-info" class="request-book-info"></div>
+      <div class="form-group" id="request-type-group">
+        <label>Request type</label>
+        <select id="request-type-select">
+          <option value="borrow">Borrow</option>
+          <option value="swap">Swap</option>
+        </select>
       </div>
-      <div id="modal-search-results" class="modal-search-results"></div>
-      <div class="modal-divider"><span>or</span></div>
-      <button class="btn-outline w-full" id="btn-manual">Enter Details Manually</button>
-    </div>
 
-    <!-- Step 2: Fill in the form -->
-    <div id="step-form" class="modal-step" style="display:none">
-      <form id="add-book-form" novalidate>
-        <input type="hidden" id="f-thumbnail">
-        <input type="hidden" id="f-google-books-id">
-        <input type="hidden" id="f-published-date">
-        <input type="hidden" id="f-categories">
+      <!-- Swap offer section — shown only when Swap is selected -->
+      <div id="swap-offer-section" hidden>
+        <div class="swap-offer-header">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 16V4m0 0L3 8m4-4 4 4M17 8v12m0 0 4-4m-4 4-4-4"/></svg>
+          Your Swap Offer
+        </div>
+        <p class="modal-hint">Choose a book from your listed books or search for a new one to offer in exchange.</p>
 
-        <div class="form-selected-book" id="form-selected-book" style="display:none">
-          <img id="form-selected-thumb" src="" alt="" style="display:none">
-          <div>
-            <div id="form-selected-title" class="form-sel-title"></div>
-            <div id="form-selected-authors" class="form-sel-authors"></div>
+        <!-- Swap source tabs -->
+        <div class="swap-source-tabs" style="display:flex;gap:8px;margin-bottom:12px;">
+          <button type="button" class="btn-ghost btn-sm swap-src-tab active" id="swap-tab-mybooks" onclick="showSwapMyBooks()">📚 My Listed Books</button>
+          <button type="button" class="btn-ghost btn-sm swap-src-tab" id="swap-tab-search" onclick="showSwapSearchTab()">🔍 Search Google Books</button>
+        </div>
+
+        <!-- My Listed Books picker -->
+        <div id="swap-mybooks-step">
+          <div id="swap-mybooks-results"><p style="color:var(--text-muted);font-size:.85rem;">Loading your books…</p></div>
+        </div>
+
+        <!-- Google Books search for swap book -->
+        <div id="swap-search-step" hidden>
+          <div class="search-box" style="margin-bottom:10px;">
+            <input type="text" id="swap-search-input" placeholder="Search your book to offer…" autocomplete="off">
+            <button type="button" class="btn-search" id="swap-search-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+              Search
+            </button>
           </div>
+          <div id="swap-search-results"></div>
+          <button type="button" class="btn-ghost btn-sm" id="swap-manual-btn" style="margin-top:6px;">Add manually</button>
         </div>
 
-        <!-- Cover upload -->
-        <div class="form-row">
-          <label class="form-label">Book Cover <small>(optional)</small></label>
-          <div class="cover-upload-wrap">
-            <div class="cover-upload-preview" id="cover-preview" style="display:none">
-              <img id="cover-preview-img" src="" alt="Cover preview">
-              <button type="button" class="btn-remove-cover" id="btn-remove-cover" title="Remove cover">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
-            </div>
-            <label class="cover-upload-placeholder" id="cover-placeholder" for="f-cover-upload">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-              <span>Upload Cover</span>
-              <small>JPG, PNG · max 5MB</small>
-            </label>
-            <input type="file" id="f-cover-upload" accept="image/*" style="display:none">
+        <!-- Selected swap book preview / manual form -->
+        <div id="swap-book-form" hidden>
+          <div id="swap-book-preview" class="swap-book-preview"></div>
+          <div class="form-group">
+            <label>Book title <span class="required">*</span></label>
+            <input type="text" id="swap-title" placeholder="Title of your book">
           </div>
-        </div>
-
-        <div class="form-row">
-          <label class="form-label">Book Title <span class="req">*</span></label>
-          <input class="form-input" type="text" id="f-title" placeholder="e.g. The Alchemist" required>
-        </div>
-        <div class="form-row">
-          <label class="form-label">Author(s)</label>
-          <input class="form-input" type="text" id="f-authors" placeholder="e.g. Paulo Coelho">
-        </div>
-        <div class="form-row two-col">
-          <div>
-            <label class="form-label">Your Name <span class="req">*</span></label>
-            <input class="form-input" type="text" id="f-owner-name" placeholder="e.g. Maria Santos" required>
+          <div class="form-group">
+            <label>Author(s)</label>
+            <input type="text" id="swap-authors" placeholder="Author(s)">
           </div>
-          <div>
-            <label class="form-label">Condition</label>
-            <select class="form-input" id="f-condition">
-              <option value="new">New</option>
-              <option value="like_new">Like New</option>
-              <option value="good" selected>Good</option>
-              <option value="fair">Fair</option>
-              <option value="worn">Worn</option>
+          <div class="form-group">
+            <label>Condition of your book</label>
+            <select id="swap-condition">
+              <option value="Like New">Like New</option>
+              <option value="Good" selected>Good</option>
+              <option value="Fair">Fair</option>
+              <option value="Acceptable">Acceptable</option>
             </select>
           </div>
+          <input type="hidden" id="swap-thumbnail">
+          <input type="hidden" id="swap-description">
+          <input type="hidden" id="swap-google-id">
+          <button type="button" class="btn-ghost btn-sm" id="swap-change-btn" style="margin-top:4px;">← Search again</button>
         </div>
-        <div class="form-row">
-          <label class="form-label">Available For <span class="req">*</span></label>
-          <div class="listing-type-group">
-            <label class="listing-type-option">
-              <input type="radio" name="f-listing-type" value="borrow" checked>
-              <span class="listing-type-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                Borrow
-              </span>
-            </label>
-            <label class="listing-type-option">
-              <input type="radio" name="f-listing-type" value="swap">
-              <span class="listing-type-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
-                Swap
-              </span>
-            </label>
-            <label class="listing-type-option">
-              <input type="radio" name="f-listing-type" value="both">
-              <span class="listing-type-btn">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-                Both
-              </span>
-            </label>
-          </div>
-        </div>
-        <div class="form-row">
-          <label class="form-label">Your Contact <small>(email, phone, or social)</small></label>
-          <input class="form-input" type="text" id="f-owner-contact" placeholder="e.g. maria@email.com or @mariareads">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Location <small>(barangay/city for meetup)</small></label>
-          <input class="form-input" type="text" id="f-location" placeholder="e.g. Brgy. San Antonio, Quezon City">
-        </div>
-        <div class="form-row">
-          <label class="form-label">Notes <small>(optional)</small></label>
-          <textarea class="form-input" id="f-notes" rows="2" placeholder="Any extra info — e.g. 'Pickup available on weekends'"></textarea>
-        </div>
+      </div>
 
-        <div class="modal-actions">
-          <button type="button" class="btn-outline" id="btn-back-to-pick">← Back</button>
-          <button type="submit" class="btn-primary" id="btn-submit-book">List Book</button>
+      <div class="form-group" style="margin-top:14px;">
+        <label>Message (optional)</label>
+        <textarea id="request-message" rows="2" placeholder="Introduce yourself or add any details…"></textarea>
+      </div>
+
+      <div class="form-section-divider" style="border-top:1px solid var(--border);margin:14px 0 12px;"></div>
+      <div class="form-section-label" style="font-size:.8rem;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">📅 Proposed Meetup</div>
+
+      <div class="form-row">
+        <div class="form-group">
+          <label>Date <span class="required">*</span></label>
+          <input type="date" id="request-meetup-date" min="">
         </div>
-      </form>
+        <div class="form-group">
+          <label>Time <span class="required">*</span></label>
+          <input type="time" id="request-meetup-time">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Meetup Location <span class="required">*</span></label>
+        <input type="text" id="request-meetup-location" placeholder="e.g. SM City Dasma entrance, 7-Eleven Salitran…">
+      </div>
+      <input type="hidden" id="request-book-id">
+      <div class="modal-actions">
+        <button type="button" class="btn-ghost" id="request-cancel-btn">Cancel</button>
+        <button type="button" class="btn-primary" id="request-submit-btn">Send Request</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Book Detail Modal -->
+<div id="book-detail-modal" class="modal-overlay" hidden>
+  <div class="modal-card" style="max-width:560px;">
+    <div class="modal-header">
+      <div class="modal-title" id="detail-modal-title">Book Details</div>
+      <button class="modal-close" id="book-detail-close">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="book-detail-body">
     </div>
   </div>
 </div>
