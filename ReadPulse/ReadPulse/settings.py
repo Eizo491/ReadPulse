@@ -8,6 +8,12 @@ SECRET_KEY = 'django-insecure-ktvdk@s_5s@j3*(c9&vkqd#nzly(1ca2zd!_bskj(nny$5of&%
 DEBUG = True
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'readpulse.pythonanywhere.com']
 
+# Use console email locally; on PythonAnywhere you can configure real SMTP later
+if "pythonanywhere" in socket.gethostname():
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',

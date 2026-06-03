@@ -303,8 +303,18 @@ function renderResults(booksData, abData, query, startIndex) {
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
+// Store audiobook data for inline player
+const audiobookStore = {};
+let abStoreCounter = 0;
+
+function storeAudiobook(ab) {
+  const key = `ab_${++abStoreCounter}`;
+  audiobookStore[key] = ab;
+  return key;
+}
+
 function buildAudiobookCard(ab) {
-  const detailUrl = ab.url_librivox || '#';
+  const storeKey = storeAudiobook(ab);
   const title = escHtml(ab.title || 'Unknown Title');
   const author = escHtml(ab.authors || 'Unknown Author');
   const lang = ab.language ? `<span class="book-year">${escHtml(ab.language)}</span>` : '';
@@ -313,7 +323,7 @@ function buildAudiobookCard(ab) {
 
   return `
     <div class="book-card audiobook-card" role="article">
-      <a href="${detailUrl}" target="_blank" rel="noopener" class="book-card-link" aria-label="Listen to ${title} on LibriVox">
+      <button class="book-card-link audiobook-card-btn" aria-label="Listen to ${title}" data-ab-key="${escAttr(storeKey)}">
         <div class="book-cover audiobook-cover-placeholder">
           <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           <span>Audiobook</span>
@@ -325,13 +335,11 @@ function buildAudiobookCard(ab) {
             ${year}${lang}${duration}
           </div>
         </div>
-      </a>
-      ${ab.url_librivox ? `
-      <a href="${escHtml(ab.url_librivox)}" target="_blank" rel="noopener"
-         class="audiobook-listen-btn" aria-label="Listen on LibriVox" title="Listen on LibriVox">
+      </button>
+      <button class="audiobook-listen-btn" aria-label="Listen to ${title}" data-ab-key="${escAttr(storeKey)}">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
         Listen
-      </a>` : ''}
+      </button>
     </div>`;
 }
 
@@ -749,6 +757,135 @@ function closeReader() {
   if (viewerEl) viewerEl.innerHTML = '';
 }
 
+// ─── Inline Audio Player ──────────────────────────────────────
+
+let currentAudio = null;
+let currentChapterIndex = 0;
+let playerChapters = [];
+
+function initAudioPlayer() {
+  const modal = document.getElementById('audio-player-modal');
+  if (!modal) return;
+
+  document.getElementById('audio-close-btn').addEventListener('click', closeAudioPlayer);
+  modal.addEventListener('click', e => { if (e.target === modal) closeAudioPlayer(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeAudioPlayer(); });
+
+  // Delegate clicks on audiobook cards and listen buttons
+  document.addEventListener('click', e => {
+    const btn = e.target.closest('[data-ab-key]');
+    if (!btn) return;
+    const key = btn.getAttribute('data-ab-key');
+    const ab = audiobookStore[key];
+    if (ab) openAudioPlayer(ab);
+  });
+}
+
+function openAudioPlayer(ab) {
+  const modal = document.getElementById('audio-player-modal');
+  const titleEl = document.getElementById('audio-player-title');
+  const authorEl = document.getElementById('audio-player-author');
+  const chapterList = document.getElementById('audio-chapter-list');
+  const audioEl = document.getElementById('audio-player-element');
+  const statusEl = document.getElementById('audio-player-status');
+  const nowPlayingEl = document.getElementById('audio-now-playing');
+  const librivoxLink = document.getElementById('audio-librivox-link');
+
+  // Reset
+  playerChapters = [];
+  currentChapterIndex = 0;
+  if (currentAudio) { currentAudio.pause(); }
+  audioEl.src = '';
+  chapterList.innerHTML = '';
+  nowPlayingEl.textContent = '';
+  statusEl.hidden = false;
+  statusEl.innerHTML = `<div class="reader-spinner"></div><span>Loading chapters…</span>`;
+
+  titleEl.textContent = ab.title || 'Unknown Title';
+  authorEl.textContent = ab.authors || 'Unknown Author';
+  if (ab.url_librivox) {
+    librivoxLink.href = ab.url_librivox;
+    librivoxLink.hidden = false;
+  } else {
+    librivoxLink.hidden = true;
+  }
+
+  modal.hidden = false;
+  document.body.style.overflow = 'hidden';
+
+  if (!ab.url_rss) {
+    statusEl.innerHTML = `<span>No chapter list available for this audiobook.</span>`;
+    return;
+  }
+
+  fetch(`/api/audiobook-rss/?url=${encodeURIComponent(ab.url_rss)}`)
+    .then(r => r.json())
+    .then(data => {
+      statusEl.hidden = true;
+      if (!data.chapters || data.chapters.length === 0) {
+        statusEl.hidden = false;
+        statusEl.innerHTML = `<span>No playable chapters found.</span>`;
+        return;
+      }
+      playerChapters = data.chapters;
+      renderChapterList(chapterList, audioEl, nowPlayingEl);
+      playChapter(0, audioEl, chapterList, nowPlayingEl);
+    })
+    .catch(() => {
+      statusEl.innerHTML = `<span>Could not load chapters. Try listening on LibriVox.</span>`;
+    });
+}
+
+function renderChapterList(listEl, audioEl, nowPlayingEl) {
+  listEl.innerHTML = '';
+  playerChapters.forEach((ch, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'audio-chapter-item';
+    btn.setAttribute('data-index', i);
+    btn.innerHTML = `
+      <span class="audio-chapter-num">${i + 1}</span>
+      <span class="audio-chapter-title">${escHtml(ch.title)}</span>
+      ${ch.duration ? `<span class="audio-chapter-dur">${escHtml(ch.duration)}</span>` : ''}`;
+    btn.addEventListener('click', () => playChapter(i, audioEl, listEl, nowPlayingEl));
+    listEl.appendChild(btn);
+  });
+}
+
+function playChapter(index, audioEl, listEl, nowPlayingEl) {
+  if (index < 0 || index >= playerChapters.length) return;
+  currentChapterIndex = index;
+  const ch = playerChapters[index];
+
+  // Update active state
+  listEl.querySelectorAll('.audio-chapter-item').forEach((btn, i) => {
+    btn.classList.toggle('active', i === index);
+  });
+  // Scroll active chapter into view
+  const activeBtn = listEl.querySelector('.audio-chapter-item.active');
+  if (activeBtn) activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+  nowPlayingEl.textContent = ch.title;
+  audioEl.src = ch.url;
+  audioEl.play().catch(() => {});
+
+  // Auto-advance to next chapter
+  audioEl.onended = () => {
+    if (currentChapterIndex + 1 < playerChapters.length) {
+      playChapter(currentChapterIndex + 1, audioEl, listEl, nowPlayingEl);
+    }
+  };
+}
+
+function closeAudioPlayer() {
+  const modal = document.getElementById('audio-player-modal');
+  if (!modal) return;
+  modal.hidden = true;
+  document.body.style.overflow = '';
+  const audioEl = document.getElementById('audio-player-element');
+  if (audioEl) { audioEl.pause(); audioEl.src = ''; }
+  playerChapters = [];
+}
+
 // ─── Mobile Sidebar Toggle ────────────────────────────────────
 
 function initMobileNav() {
@@ -800,6 +937,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initFavoritesPage();
   initDetailPage();
   initReaderModal();
+  initAudioPlayer();
 });
 
 // Re-load state when user navigates back (bfcache restore)

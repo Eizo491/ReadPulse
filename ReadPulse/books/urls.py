@@ -13,6 +13,7 @@ urlpatterns = [
     # ── RESTful API: Google Books ──
     path('api/search/', views.api_search_books, name='api_search'),
     path('api/search-audiobooks/', views.api_search_audiobooks, name='api_search_audiobooks'),
+    path('api/audiobook-rss/', views.api_audiobook_rss_proxy, name='api_audiobook_rss'),
     path('api/books/<str:google_books_id>/', views.api_book_detail, name='api_book_detail'),
 
     # ── RESTful API: Favorites ──

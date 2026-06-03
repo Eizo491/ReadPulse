@@ -281,6 +281,48 @@ def api_search_audiobooks(request):
     })
 
 
+def api_audiobook_rss_proxy(request):
+    """Proxy LibriVox RSS feed to avoid CORS issues in the browser."""
+    rss_url = request.GET.get('url', '').strip()
+
+    # Only allow LibriVox RSS URLs
+    if not rss_url.startswith('https://librivox.org/rss/') and \
+       not rss_url.startswith('http://librivox.org/rss/'):
+        return JsonResponse({'error': 'Invalid RSS URL'}, status=400)
+
+    try:
+        req = urllib.request.Request(rss_url, headers={'User-Agent': 'ReadPulse/1.0'})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            xml_data = resp.read().decode('utf-8')
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+    import xml.etree.ElementTree as ET
+    try:
+        root = ET.fromstring(xml_data)
+    except ET.ParseError as e:
+        return JsonResponse({'error': f'XML parse error: {e}'}, status=500)
+
+    channel = root.find('channel')
+    if channel is None:
+        return JsonResponse({'chapters': []})
+
+    chapters = []
+    for item in channel.findall('item'):
+        title_el = item.find('title')
+        enclosure = item.find('enclosure')
+        duration_el = item.find('{http://www.itunes.com/dtds/podcast-1.0.dtd}duration')
+        if enclosure is not None:
+            chapters.append({
+                'title': title_el.text.strip() if title_el is not None and title_el.text else 'Chapter',
+                'url': enclosure.get('url', ''),
+                'type': enclosure.get('type', 'audio/mpeg'),
+                'duration': duration_el.text.strip() if duration_el is not None and duration_el.text else '',
+            })
+
+    return JsonResponse({'chapters': chapters})
+
+
 # ─────────────────────────────────────────────
 # RESTful API  –  Favorites
 # ─────────────────────────────────────────────
