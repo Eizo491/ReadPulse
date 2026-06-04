@@ -13,6 +13,7 @@ urlpatterns = [
     # ── RESTful API: Google Books ──
     path('api/search/', views.api_search_books, name='api_search'),
     path('api/search-audiobooks/', views.api_search_audiobooks, name='api_search_audiobooks'),
+    path('api/popular-audiobooks/', views.api_popular_audiobooks, name='api_popular_audiobooks'),
     path('api/audiobook-rss/', views.api_audiobook_rss_proxy, name='api_audiobook_rss'),
     path('api/books/<str:google_books_id>/', views.api_book_detail, name='api_book_detail'),
 
@@ -21,6 +22,12 @@ urlpatterns = [
     path('api/favorites/add/', views.api_add_favorite, name='api_favorites_add'),
     path('api/favorites/<str:google_books_id>/remove/', views.api_remove_favorite, name='api_favorite_remove'),
     path('api/favorites/<str:google_books_id>/', views.api_favorite_detail, name='api_favorite_detail'),
+
+    # ── RESTful API: Audiobook Favorites ──
+    path('api/favorite-audiobooks/', views.api_list_favorite_audiobooks, name='api_fav_audiobooks_list'),
+    path('api/favorite-audiobooks/add/', views.api_add_favorite_audiobook, name='api_fav_audiobooks_add'),
+    path('api/favorite-audiobooks/<str:librivox_id>/remove/', views.api_remove_favorite_audiobook, name='api_fav_audiobook_remove'),
+    path('api/favorite-audiobooks/<str:librivox_id>/', views.api_favorite_audiobook_detail, name='api_fav_audiobook_detail'),
 
     # ── RESTful API: Community Books ──
     path('api/community/', views.api_community_books, name='api_community_books'),

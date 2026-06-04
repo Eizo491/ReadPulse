@@ -86,5 +86,6 @@
 {% endblock %}
 
 {% block scripts %}
+<script>window.RP_USER_ID = "{{ user_id }}";</script>
 <script src="{% static 'js/main.js' %}"></script>
 {% endblock %}

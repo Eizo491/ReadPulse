@@ -11,7 +11,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 
-from .models import FavoriteBook, CommunityBook, BookRequest
+from .models import FavoriteBook, FavoriteAudiobook, CommunityBook, BookRequest
 
 
 # ─────────────────────────────────────────────
@@ -20,13 +20,13 @@ from .models import FavoriteBook, CommunityBook, BookRequest
 
 @login_required
 def search_page(request):
-    fav_count = FavoriteBook.objects.filter(user=request.user).count()
-    return render(request, 'books/search.html', {'fav_count': fav_count})
+    fav_count = FavoriteBook.objects.filter(user=request.user).count() + FavoriteAudiobook.objects.filter(user=request.user).count()
+    return render(request, 'books/search.html', {'fav_count': fav_count, 'user_id': request.user.id})
 
 
 @login_required
 def book_detail_page(request, google_books_id):
-    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count() + FavoriteAudiobook.objects.filter(user=request.user).count()
     return render(request, 'books/book_detail.html', {
         'google_books_id': google_books_id,
         'fav_count': fav_count,
@@ -38,25 +38,25 @@ def favorites_page(request):
     favorites = FavoriteBook.objects.filter(user=request.user)
     return render(request, 'books/favorites.html', {
         'favorites': favorites,
-        'fav_count': favorites.count(),
+        'fav_count': favorites.count() + FavoriteAudiobook.objects.filter(user=request.user).count(),
     })
 
 
 @login_required
 def community_page(request):
-    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count() + FavoriteAudiobook.objects.filter(user=request.user).count()
     return render(request, 'books/community.html', {'fav_count': fav_count})
 
 
 @login_required
 def my_listings_page(request):
-    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count() + FavoriteAudiobook.objects.filter(user=request.user).count()
     return render(request, 'books/my_listings.html', {'fav_count': fav_count})
 
 
 @login_required
 def requests_page(request):
-    fav_count = FavoriteBook.objects.filter(user=request.user).count()
+    fav_count = FavoriteBook.objects.filter(user=request.user).count() + FavoriteAudiobook.objects.filter(user=request.user).count()
     return render(request, 'books/requests.html', {'fav_count': fav_count})
 
 
@@ -388,6 +388,139 @@ def api_favorite_detail(request, google_books_id):
         book = FavoriteBook.objects.get(user=request.user, google_books_id=google_books_id)
         return JsonResponse({'is_favorite': True, 'book': book.to_dict()})
     except FavoriteBook.DoesNotExist:
+        return JsonResponse({'is_favorite': False})
+
+
+@require_http_methods(["GET"])
+def api_popular_audiobooks(request):
+    """Return 8 popular public domain audiobooks from LibriVox.
+    Fetches from multiple keyword queries in parallel so there are always enough results."""
+    import random
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    TARGET = 8
+    popular_titles = ['adventures', 'pride', 'mystery', 'treasure', 'sherlock',
+                      'romance', 'classic', 'journey', 'secret', 'war']
+    queries = random.sample(popular_titles, k=4)
+
+    def fetch_query(q):
+        url = (
+            f'https://librivox.org/api/feed/audiobooks'
+            f'?title={urllib.parse.quote(q)}&extended=1&format=json&limit=8&offset=0'
+        )
+        try:
+            req = urllib.request.Request(url, headers={'User-Agent': 'ReadPulse/1.0'})
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                data = json.loads(resp.read().decode('utf-8'))
+            return data.get('books', []) or []
+        except Exception:
+            return []
+
+    seen_ids = set()
+    books_raw = []
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        futures = [executor.submit(fetch_query, q) for q in queries]
+        for future in as_completed(futures):
+            for ab in future.result():
+                ab_id = ab.get('id', '')
+                if ab_id and ab_id not in seen_ids:
+                    seen_ids.add(ab_id)
+                    books_raw.append(ab)
+                if len(books_raw) >= TARGET:
+                    break
+            if len(books_raw) >= TARGET:
+                break
+
+    audiobooks = []
+    for ab in books_raw[:TARGET]:
+        authors_list = ab.get('authors', []) or []
+        author_names = ', '.join(
+            f"{a.get('first_name', '')} {a.get('last_name', '')}".strip()
+            for a in authors_list
+            if a.get('first_name') or a.get('last_name')
+        ) or 'Unknown Author'
+        audiobooks.append({
+            'id': ab.get('id', ''),
+            'title': ab.get('title', 'Unknown Title').strip(),
+            'authors': author_names,
+            'description': ab.get('description', '').strip(),
+            'url_librivox': ab.get('url_librivox', ''),
+            'url_rss': ab.get('url_rss', ''),
+            'url_zip_file': ab.get('url_zip_file', ''),
+            'language': ab.get('language', ''),
+            'published': ab.get('copyright_year', ''),
+            'num_sections': ab.get('num_sections', ''),
+            'totaltime': ab.get('totaltime', ''),
+        })
+    return JsonResponse({'audiobooks': audiobooks})
+
+
+# ─────────────────────────────────────────────
+# RESTful API  –  Audiobook Favorites
+# ─────────────────────────────────────────────
+
+@login_required
+@require_http_methods(["GET"])
+def api_list_favorite_audiobooks(request):
+    favs = FavoriteAudiobook.objects.filter(user=request.user)
+    return JsonResponse({'audiobooks': [f.to_dict() for f in favs]})
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_add_favorite_audiobook(request):
+    try:
+        payload = json.loads(request.body)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON body.'}, status=400)
+
+    librivox_id = str(payload.get('id', '')).strip()
+    if not librivox_id:
+        return JsonResponse({'error': '"id" is required.'}, status=400)
+
+    ab, created = FavoriteAudiobook.objects.get_or_create(
+        user=request.user,
+        librivox_id=librivox_id,
+        defaults={
+            'title': payload.get('title', ''),
+            'authors': payload.get('authors', ''),
+            'description': payload.get('description', ''),
+            'url_librivox': payload.get('url_librivox', ''),
+            'url_rss': payload.get('url_rss', ''),
+            'url_zip_file': payload.get('url_zip_file', ''),
+            'language': payload.get('language', ''),
+            'published': payload.get('published', ''),
+            'num_sections': str(payload.get('num_sections', '')),
+            'totaltime': payload.get('totaltime', ''),
+        },
+    )
+    status_code = 201 if created else 200
+    return JsonResponse({
+        'message': 'Added to favorites.' if created else 'Already in favorites.',
+        'audiobook': ab.to_dict(),
+    }, status=status_code)
+
+
+@login_required
+@csrf_exempt
+@require_http_methods(["DELETE"])
+def api_remove_favorite_audiobook(request, librivox_id):
+    try:
+        ab = FavoriteAudiobook.objects.get(user=request.user, librivox_id=librivox_id)
+    except FavoriteAudiobook.DoesNotExist:
+        return JsonResponse({'error': 'Audiobook not found in favorites.'}, status=404)
+    ab.delete()
+    return JsonResponse({'message': 'Removed from favorites.'}, status=200)
+
+
+@login_required
+@require_http_methods(["GET"])
+def api_favorite_audiobook_detail(request, librivox_id):
+    try:
+        ab = FavoriteAudiobook.objects.get(user=request.user, librivox_id=librivox_id)
+        return JsonResponse({'is_favorite': True, 'audiobook': ab.to_dict()})
+    except FavoriteAudiobook.DoesNotExist:
         return JsonResponse({'is_favorite': False})
 
 

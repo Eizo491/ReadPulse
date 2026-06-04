@@ -38,6 +38,46 @@ class FavoriteBook(models.Model):
         }
 
 
+class FavoriteAudiobook(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='favorite_audiobooks', null=True, blank=True)
+    librivox_id = models.CharField(max_length=100)
+    title = models.CharField(max_length=500)
+    authors = models.CharField(max_length=500, blank=True, default='')
+    description = models.TextField(blank=True, default='')
+    url_librivox = models.TextField(blank=True, default='')
+    url_rss = models.TextField(blank=True, default='')
+    url_zip_file = models.TextField(blank=True, default='')
+    language = models.CharField(max_length=100, blank=True, default='')
+    published = models.CharField(max_length=50, blank=True, default='')
+    num_sections = models.CharField(max_length=20, blank=True, default='')
+    totaltime = models.CharField(max_length=50, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ('user', 'librivox_id')
+
+    def __str__(self):
+        return self.title
+
+    def to_dict(self):
+        return {
+            'librivox_id': self.librivox_id,
+            'title': self.title,
+            'authors': self.authors,
+            'description': self.description,
+            'url_librivox': self.url_librivox,
+            'url_rss': self.url_rss,
+            'url_zip_file': self.url_zip_file,
+            'language': self.language,
+            'published': self.published,
+            'num_sections': self.num_sections,
+            'totaltime': self.totaltime,
+            'created_at': self.created_at.isoformat(),
+            'is_favorite': True,
+        }
+
+
 class CommunityBook(models.Model):
     LISTING_TYPE_CHOICES = [
         ('borrow', 'Available to Borrow'),
