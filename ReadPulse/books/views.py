@@ -11,7 +11,12 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 from django.db.models import Q
 
+from rest_framework import generics
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.exceptions import PermissionDenied
+
 from .models import FavoriteBook, CommunityBook, BookRequest
+from .serializers import FavoriteBookSerializer, CommunityBookSerializer, BookRequestSerializer
 
 
 # ─────────────────────────────────────────────
@@ -290,7 +295,7 @@ def api_favorite_detail(request, google_books_id):
 @login_required
 @require_http_methods(["GET"])
 def api_community_books(request):
-    """GET /api/community/ – list all available community books (excluding own)."""
+    """GET /api/community/ – list all available community books."""
     listing_type = request.GET.get('type', '')
     search = request.GET.get('q', '').strip()
 
@@ -364,16 +369,13 @@ def api_community_book_detail(request, book_id):
     for field in ('title', 'authors', 'isbn', 'published_date', 'description',
                   'categories', 'publisher', 'language', 'google_books_id',
                   'listing_type', 'condition', 'notes', 'status',
-                  'contact_info', 'location'):
+                  'contact_info', 'location', 'thumbnail'):
         if field in payload:
             setattr(book, field, payload[field])
-    # thumbnail — allow update
-    if 'thumbnail' in payload:
-        book.thumbnail = payload['thumbnail']
+
     if 'page_count' in payload:
         book.page_count = payload['page_count'] or None
-        if field in payload:
-            setattr(book, field, payload[field])
+
     book.save()
     return JsonResponse({'message': 'Listing updated.', 'book': book.to_dict(request_user=request.user)})
 
@@ -421,7 +423,6 @@ def api_create_request(request):
     if community_book.owner == request.user:
         return JsonResponse({'error': 'You cannot request your own book.'}, status=400)
 
-    # Check listing type allows this request type
     if community_book.listing_type not in (request_type, 'both'):
         return JsonResponse({'error': f'This book is not available for {request_type}.'}, status=400)
 
@@ -491,7 +492,6 @@ def api_update_request(request, request_id):
 
     new_status = payload.get('status', '')
 
-    # Determine who is acting
     try:
         book_request = BookRequest.objects.select_related('community_book', 'community_book__owner', 'requester').get(id=request_id)
     except BookRequest.DoesNotExist:
@@ -503,23 +503,19 @@ def api_update_request(request, request_id):
     if not is_owner and not is_requester:
         return JsonResponse({'error': 'Permission denied.'}, status=403)
 
-    # Owner can accept, decline, complete
     if is_owner and new_status in ('accepted', 'declined', 'completed'):
         book_request.status = new_status
         if new_status == 'accepted':
-            # Mark book as borrowed/swapped
             book_request.community_book.status = 'borrowed' if book_request.request_type == 'borrow' else 'swapped'
             book_request.community_book.save()
         book_request.save()
         return JsonResponse({'message': f'Request {new_status}.', 'request': book_request.to_dict()})
 
-    # Requester can cancel
     if is_requester and new_status == 'cancelled':
         book_request.status = 'cancelled'
         book_request.save()
         return JsonResponse({'message': 'Request cancelled.', 'request': book_request.to_dict()})
 
-    # Requester can return a borrowed book (accepted borrow → completed + book back to available)
     if is_requester and new_status == 'returned':
         if book_request.request_type != 'borrow' or book_request.status != 'accepted':
             return JsonResponse({'error': 'Only accepted borrow requests can be returned.'}, status=400)
@@ -530,3 +526,82 @@ def api_update_request(request, request_id):
         return JsonResponse({'message': 'Book returned successfully.', 'request': book_request.to_dict()})
 
     return JsonResponse({'error': 'Invalid status transition.'}, status=400)
+
+
+# ── FavoriteBook ──────────────────────────────────────────────────────────────
+
+class FavoriteBookListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = FavoriteBookSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return FavoriteBook.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+
+class FavoriteBookRetrieveDestroyAPIView(generics.RetrieveDestroyAPIView):
+    serializer_class = FavoriteBookSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return FavoriteBook.objects.filter(user=self.request.user)
+
+
+# ── CommunityBook ─────────────────────────────────────────────────────────────
+
+class CommunityBookListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = CommunityBookSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return CommunityBook.objects.select_related('owner').all()
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+
+class CommunityBookRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = CommunityBookSerializer
+    permission_classes = [IsAuthenticated]
+    queryset = CommunityBook.objects.select_related('owner').all()
+
+    def _check_owner(self):
+        obj = self.get_object()
+        if obj.owner != self.request.user:
+            raise PermissionDenied("You can only modify your own listings.")
+        return obj
+
+    def update(self, request, *args, **kwargs):
+        self._check_owner()
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        self._check_owner()
+        return super().destroy(request, *args, **kwargs)
+
+
+# ── BookRequest ───────────────────────────────────────────────────────────────
+
+class BookRequestListCreateAPIView(generics.ListCreateAPIView):
+    serializer_class = BookRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return BookRequest.objects.select_related(
+            'requester', 'community_book', 'community_book__owner'
+        ).filter(requester=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(requester=self.request.user)
+
+
+class BookRequestRetrieveUpdateDestroyAPIView(generics.RetrieveUpdateDestroyAPIView):
+    serializer_class = BookRequestSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return BookRequest.objects.select_related(
+            'requester', 'community_book', 'community_book__owner'
+        ).filter(requester=self.request.user)

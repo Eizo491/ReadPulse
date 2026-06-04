@@ -32,4 +32,14 @@ urlpatterns = [
     path('api/requests/mine/', views.api_my_requests, name='api_my_requests'),
     path('api/requests/for-me/', views.api_requests_for_me, name='api_requests_for_me'),
     path('api/requests/<int:request_id>/', views.api_update_request, name='api_update_request'),
+
+    # ── DRF Token-auth endpoints ──────────────────────────────────────────────
+    path('api/favorite-books/', views.FavoriteBookListCreateAPIView.as_view(), name='drf-favorite-list-create'),
+    path('api/favorite-books/<int:pk>/', views.FavoriteBookRetrieveDestroyAPIView.as_view(), name='drf-favorite-detail'),
+
+    path('api/community-books/', views.CommunityBookListCreateAPIView.as_view(), name='drf-community-book-list-create'),
+    path('api/community-books/<int:pk>/', views.CommunityBookRetrieveUpdateDestroyAPIView.as_view(), name='drf-community-book-detail'),
+
+    path('api/book-requests/', views.BookRequestListCreateAPIView.as_view(), name='drf-book-request-list-create'),
+    path('api/book-requests/<int:pk>/', views.BookRequestRetrieveUpdateDestroyAPIView.as_view(), name='drf-book-request-detail'),
 ]
