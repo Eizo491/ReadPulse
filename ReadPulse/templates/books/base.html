@@ -11,6 +11,25 @@
 </head>
 <body>
 
+<!-- ── Mobile Header ── -->
+<header class="mobile-header">
+  <a href="/" class="mobile-logo">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+    </svg>
+    Read<span>Pulse</span>
+  </a>
+  <button class="hamburger" id="hamburger-btn" aria-label="Toggle menu" aria-expanded="false">
+    <span></span>
+    <span></span>
+    <span></span>
+  </button>
+</header>
+
+<!-- ── Sidebar overlay (mobile) ── -->
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
+
 <!-- ── Sidebar ── -->
 <aside class="sidebar">
   <div class="sidebar-logo">
@@ -107,5 +126,44 @@
 <div class="toast-container" id="toast-container"></div>
 
 {% block scripts %}{% endblock %}
+
+<script>
+(function() {
+  var hamburger = document.getElementById('hamburger-btn');
+  var overlay = document.getElementById('sidebar-overlay');
+  var sidebar = document.querySelector('.sidebar');
+
+  function openSidebar() {
+    sidebar.classList.add('sidebar-open');
+    overlay.classList.add('active');
+    document.body.classList.add('sidebar-is-open');
+    hamburger.setAttribute('aria-expanded', 'true');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('sidebar-open');
+    overlay.classList.remove('active');
+    document.body.classList.remove('sidebar-is-open');
+    hamburger.setAttribute('aria-expanded', 'false');
+  }
+
+  hamburger.addEventListener('click', function() {
+    if (sidebar.classList.contains('sidebar-open')) {
+      closeSidebar();
+    } else {
+      openSidebar();
+    }
+  });
+
+  overlay.addEventListener('click', closeSidebar);
+
+  // Close sidebar on nav link click (mobile)
+  document.querySelectorAll('.sidebar .nav-item').forEach(function(link) {
+    link.addEventListener('click', function() {
+      if (window.innerWidth <= 768) closeSidebar();
+    });
+  });
+})();
+</script>
 </body>
 </html>

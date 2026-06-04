@@ -3944,3 +3944,325 @@ body.auth-page {
     padding: 40px 24px;
   }
 }
+
+/* ══════════════════════════════════════════════════
+   MOBILE RESPONSIVE POLISH
+   Additional improvements for clean phone display
+   ══════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  /* ── Topbar: stack title + actions vertically on small screens ── */
+  .topbar {
+    flex-wrap: wrap;
+    gap: 10px;
+    padding: 14px 16px;
+    top: 56px; /* below mobile header */
+  }
+  .topbar-title { font-size: 1.15rem; }
+  .topbar-subtitle { font-size: 0.78rem; }
+  .topbar-actions { width: 100%; justify-content: flex-start; }
+  .topbar-actions .btn-primary { width: 100%; justify-content: center; }
+
+  /* ── Page content padding ── */
+  .page-content { padding: 16px 16px 32px; }
+
+  /* ── Community filter row: stack search + tabs ── */
+  .community-filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  .community-search-box { max-width: 100%; min-width: 0; }
+  .filter-tabs { width: 100%; justify-content: stretch; }
+  .filter-tab { flex: 1; text-align: center; }
+
+  /* ── Filter row (requests page) ── */
+  .filter-row { flex-direction: column; align-items: stretch; }
+
+  /* ── Requests topbar ── */
+  .rq-topbar { flex-direction: column; align-items: flex-start !important; gap: 10px; }
+  .rq-topbar-inner { flex-wrap: wrap; }
+
+  /* ── Modals: full-width bottom sheet feel ── */
+  .modal-overlay {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal-card, .modal {
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+    max-height: 92vh;
+    width: 100%;
+    animation: modal-slide-up 0.25s ease;
+  }
+  @keyframes modal-slide-up {
+    from { transform: translateY(40px); opacity: 0; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* ── Book detail layout ── */
+  .detail-layout, .detail-skeleton {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .detail-cover { max-width: 160px; margin: 0 auto; }
+  .detail-left  { align-items: center; }
+
+  /* ── Listings & Requests tables: scrollable ── */
+  .listings-table-wrap, .rq-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -16px;
+    padding: 0 16px;
+  }
+
+  /* ── Community detail page ── */
+  .cd-layout {
+    grid-template-columns: 1fr !important;
+    gap: 24px;
+  }
+  .cd-sidebar { position: static !important; }
+
+  /* ── Search bar on main search page ── */
+  .search-hero { padding: 24px 0 16px; }
+  .search-bar-wrap { flex-direction: row; }
+
+  /* ── Sticky topbar z-index above overlay ── */
+  .topbar { z-index: 100; }
+
+  /* ── Toast notifications ── */
+  .toast-container {
+    left: 16px !important;
+    right: 16px !important;
+    bottom: 24px;
+    top: auto !important;
+  }
+  .toast { width: 100% !important; }
+
+  /* ── My Books / Requests: card actions row ── */
+  .cd-actions { flex-wrap: wrap; gap: 8px; }
+  .cd-actions .btn-ghost,
+  .cd-actions .btn-danger { flex: 1; justify-content: center; }
+
+  /* ── Sidebar close on nav link ── */
+  .sidebar.sidebar-open { box-shadow: 4px 0 24px rgba(0,0,0,0.18); }
+}
+
+@media (max-width: 420px) {
+  /* Extra small phones */
+  .books-grid, .fav-grid, .community-grid, .skeleton-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .book-title   { font-size: 0.78rem; }
+  .book-author  { font-size: 0.72rem; }
+  .topbar-title { font-size: 1.05rem; }
+  .filter-tab   { padding: 6px 8px; font-size: 0.78rem; }
+  .btn-primary, .btn-ghost { font-size: 0.82rem; padding: 8px 12px; }
+
+  /* Modal body padding tighter */
+  .modal-body { padding: 16px; }
+  .modal-header { padding: 16px 16px 12px; }
+}
+
+
+/* ─── My Listings – compact action buttons ─── */
+.listing-actions-cell { white-space: nowrap; }
+
+.listing-actions-btns {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.listing-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+  white-space: nowrap;
+  line-height: 1;
+}
+.listing-icon-btn svg { flex-shrink: 0; }
+
+.listing-edit-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: var(--border);
+}
+.listing-edit-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+}
+
+.listing-delete-btn {
+  background: transparent;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+.listing-delete-btn:hover {
+  background: #fee2e2;
+  border-color: #fca5a5;
+}
+
+/* On small screens: icon-only (hide text label) */
+@media (max-width: 600px) {
+  .listing-icon-btn span { display: none; }
+  .listing-icon-btn { padding: 6px 8px; }
+  .listings-table th:nth-child(3),
+  .listings-table td:nth-child(3) { display: none; } /* hide Condition col */
+  .listings-table th:nth-child(5),
+  .listings-table td:nth-child(5) { display: none; } /* hide Listed date col */
+}
+
+@media (max-width: 480px) {
+  /* On very small screens also hide Type, keep Book + Status + Actions */
+  .listings-table th:nth-child(2),
+  .listings-table td:nth-child(2) { display: none; }
+}
+
+
+/* ══════════════════════════════════════════════════
+   MODAL MOBILE POLISH – Add Book & Request modals
+   ══════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+
+  /* ── Bottom-sheet slide-up behaviour ── */
+  .modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .modal-card {
+    border-radius: 18px 18px 0 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    max-height: 92vh !important;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    animation: sheet-up 0.28s cubic-bezier(0.34,1.1,0.64,1) !important;
+  }
+
+  @keyframes sheet-up {
+    from { transform: translateY(100%); opacity: 0.6; }
+    to   { transform: translateY(0);    opacity: 1; }
+  }
+
+  /* ── Drag handle indicator ── */
+  .modal-card::before {
+    content: '';
+    display: block;
+    width: 36px;
+    height: 4px;
+    background: var(--border);
+    border-radius: 2px;
+    margin: 10px auto 0;
+  }
+
+  /* ── Header: tighter ── */
+  .modal-header {
+    padding: 12px 18px 12px !important;
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 2;
+  }
+  .modal-title { font-size: 1rem !important; }
+
+  /* ── Body padding ── */
+  .modal-body { padding: 16px 18px 24px !important; }
+
+  /* ── form-row: stack on mobile ── */
+  .modal-body .form-row,
+  .modal-card .form-row {
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  /* ── Swap source tabs: equal-width pill tabs ── */
+  .swap-source-tabs {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 6px !important;
+    margin-bottom: 14px !important;
+  }
+  .swap-src-tab {
+    justify-content: center !important;
+    text-align: center !important;
+    padding: 7px 6px !important;
+    font-size: 0.8rem !important;
+  }
+
+  /* ── Modal actions: stack Cancel + Submit ── */
+  .modal-actions {
+    flex-direction: column-reverse !important;
+    gap: 8px !important;
+    margin-top: 16px !important;
+  }
+  .modal-actions .btn-ghost,
+  .modal-actions .btn-primary,
+  .modal-actions .btn-danger {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 11px 16px !important;
+    font-size: 0.9rem !important;
+  }
+
+  /* ── Search box inside modal: stack input + button ── */
+  .modal-body .search-box {
+    flex-wrap: wrap;
+  }
+  .modal-body .search-box input {
+    min-width: 0;
+    flex: 1 1 100%;
+    border-radius: var(--radius-sm) !important;
+  }
+  .modal-body .search-box .btn-search {
+    flex: 1;
+    justify-content: center;
+    border-radius: var(--radius-sm) !important;
+  }
+
+  /* ── Book cover URL + upload row: stack ── */
+  .modal-body [style*="display:flex;gap:8px;align-items:center;flex-wrap:wrap"] {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .modal-body [style*="display:flex;gap:8px;align-items:center;flex-wrap:wrap"] label.btn-ghost {
+    text-align: center;
+  }
+
+  /* ── Add search results list: tighten ── */
+  .add-search-list { max-height: 200px; }
+
+  /* ── Request book info preview ── */
+  .request-book-info {
+    padding: 10px 12px;
+    background: var(--accent-light);
+    border-radius: var(--radius-sm);
+    margin-bottom: 14px;
+    font-size: 0.85rem;
+  }
+
+  /* ── Back button full width on mobile ── */
+  #add-back-btn { width: 100% !important; text-align: center; justify-content: center !important; }
+}
+
+@media (max-width: 420px) {
+  .modal-body { padding: 12px 14px 20px !important; }
+  .modal-header { padding: 10px 14px 10px !important; }
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    font-size: 0.85rem;
+    padding: 8px 10px;
+  }
+}
