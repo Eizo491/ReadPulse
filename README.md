@@ -1,6 +1,6 @@
 # ReadPulse
 
-**ReadPulse** is a web-based reading companion built with Django. It lets users search for books and audiobooks, read previews inline, save favorites, and connect with a community to borrow or swap physical books.
+**ReadPulse** is a web-based reading companion built with Django. It lets users search for books, read previews inline, save favorites, and connect with a community to borrow or swap physical books.
 
 ---
 
