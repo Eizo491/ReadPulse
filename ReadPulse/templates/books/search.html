@@ -32,6 +32,8 @@
     </form>
   </div>
 
+  <div id="search-page-data" data-username="{{ user.username }}" style="display:none;"></div>
+
   <!-- Results -->
   <div id="results-area">
     <div class="status-msg">
@@ -42,50 +44,8 @@
   </div>
 
 </div>
-<!-- ── Audio Player Modal ── -->
-<div id="audio-player-modal" class="reader-modal" role="dialog" aria-modal="true" aria-label="Audiobook Player" hidden>
-  <div class="reader-modal-inner audio-player-inner">
-    <div class="reader-modal-header">
-      <div>
-        <div class="reader-modal-title" id="audio-player-title"></div>
-        <div class="audio-player-author" id="audio-player-author"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <a id="audio-librivox-link" href="#" target="_blank" rel="noopener" class="audio-librivox-link" title="Open on LibriVox" hidden>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          LibriVox
-        </a>
-        <button class="reader-close-btn" id="audio-close-btn" aria-label="Close player">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M18 6 6 18M6 6l12 12"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-    <div class="audio-player-body">
-      <!-- HTML5 Audio Controls -->
-      <div class="audio-controls-wrap">
-        <div class="audio-now-playing-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-          <span id="audio-now-playing" class="audio-now-playing-text"></span>
-        </div>
-        <audio id="audio-player-element" controls class="audio-element" preload="none"></audio>
-      </div>
-      <!-- Chapter list -->
-      <div class="audio-chapter-wrap">
-        <div class="audio-chapter-heading">Chapters</div>
-        <div id="audio-player-status" class="audio-player-status">
-          <div class="reader-spinner"></div><span>Loading chapters…</span>
-        </div>
-        <div id="audio-chapter-list" class="audio-chapter-list"></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 {% endblock %}
 
 {% block scripts %}
-<script>window.RP_USER_ID = "{{ user_id }}";</script>
 <script src="{% static 'js/main.js' %}"></script>
 {% endblock %}

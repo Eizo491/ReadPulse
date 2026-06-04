@@ -61,6 +61,8 @@ function initSearchPage() {
   const searchInput = document.getElementById('search-input');
   if (!searchInput) return; // not on search page
 
+  clearOtherUsersSearchState();
+
   const searchForm = document.getElementById('search-form');
 
   searchForm.addEventListener('submit', e => {
@@ -84,75 +86,101 @@ function initSearchPage() {
   }
 }
 
-const SEARCH_KEY = `rp_search_${window.RP_USER_ID || 'anon'}`;
+function getSearchStorageKey() {
+  const el = document.getElementById('search-page-data');
+  const username = el ? el.dataset.username : 'anonymous';
+  return `rp_search_${username}`;
+}
+
+function clearOtherUsersSearchState() {
+  const el = document.getElementById('search-page-data');
+  if (!el) return;
+  const currentUser = el.dataset.username;
+  const lastUser = sessionStorage.getItem('rp_active_user');
+  if (lastUser && lastUser !== currentUser) {
+    // Different user logged in — wipe the previous user's search state
+    sessionStorage.removeItem(`rp_search_${lastUser}`);
+  }
+  sessionStorage.setItem('rp_active_user', currentUser);
+}
 
 function saveSearchState(query, startIndex) {
-  sessionStorage.setItem(SEARCH_KEY, JSON.stringify({ query, startIndex }));
+  sessionStorage.setItem(getSearchStorageKey(), JSON.stringify({ query, startIndex }));
 }
 
 function getSavedSearchState() {
-  try { return JSON.parse(sessionStorage.getItem(SEARCH_KEY)); }
+  try { return JSON.parse(sessionStorage.getItem(getSearchStorageKey())); }
   catch { return null; }
 }
 
 function clearSearchState() {
-  sessionStorage.removeItem(SEARCH_KEY);
+  sessionStorage.removeItem(getSearchStorageKey());
 }
 
 async function loadFeaturedBooks() {
   const area = document.getElementById('results-area');
 
-  const skeletonCard = () => `
-    <div class="skeleton-card">
-      <div class="skeleton-cover"></div>
-      <div class="skeleton-info">
-        <div class="skeleton-line"></div>
-        <div class="skeleton-line short"></div>
-      </div>
-    </div>`;
-
-  // Show both sections as skeletons immediately
+  // Show a soft loading state
   area.innerHTML = `
     <div class="featured-header">
       <span class="featured-label">🔥 Popular Books</span>
       <span class="featured-hint">Search above to find any book</span>
     </div>
-    <div class="skeleton-grid" id="books-skeleton">${Array.from({length:12},skeletonCard).join('')}</div>
-    <div class="featured-header" style="margin-top:36px;">
-      <span class="featured-label">🎧 Popular Audiobooks</span>
-      <span class="featured-hint">Free public domain audiobooks from LibriVox</span>
-    </div>
-    <div class="skeleton-grid" id="ab-skeleton">${Array.from({length:6},skeletonCard).join('')}</div>`;
+    <div class="skeleton-grid">${Array.from({ length: 12 }, () => `
+      <div class="skeleton-card">
+        <div class="skeleton-cover"></div>
+        <div class="skeleton-info">
+          <div class="skeleton-line"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </div>`).join('')}</div>`;
 
-  const featuredQueries = ['bestseller fiction','popular novels','most read books','trending books'];
+  // Rotate through a few curated high-rating queries so results feel fresh
+  const featuredQueries = [
+    'bestseller fiction',
+    'popular novels',
+    'most read books',
+    'trending books',
+  ];
   const q = featuredQueries[Math.floor(Math.random() * featuredQueries.length)];
 
-  // Fetch books and audiobooks in parallel
-  const [booksResult, audioResult] = await Promise.allSettled([
-    fetch(`/api/search/?${new URLSearchParams({ q, max_results: 24 })}`).then(r => r.json()),
-    fetch('/api/popular-audiobooks/').then(r => r.json()),
-  ]);
+  try {
+    const params = new URLSearchParams({ q, max_results: 24 });
+    const res = await fetch(`/api/search/?${params}`);
+    const data = await res.json();
 
-  // ── Render Popular Books ──
-  const booksSkeleton = document.getElementById('books-skeleton');
-  if (booksResult.status === 'fulfilled' && booksResult.value.books && booksResult.value.books.length > 0) {
-    const sorted = [...booksResult.value.books].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
+    if (!res.ok || !data.books || data.books.length === 0) {
+      // Fallback: show a friendly message if featured load fails
+      area.innerHTML = `
+        <div class="status-msg">
+          <span class="status-icon">📚</span>
+          <p>Search for a book to get started.</p>
+          <p class="status-hint">Try "Harry Potter", "Atomic Habits", or any author name.</p>
+        </div>`;
+      return;
+    }
+
+    // Sort by rating descending
+    const sorted = [...data.books].sort((a, b) => (b.average_rating || 0) - (a.average_rating || 0));
+
     const cards = sorted.map(book => buildBookCard(book)).join('');
-    if (booksSkeleton) booksSkeleton.outerHTML = `<div class="books-grid">${cards}</div>`;
-  } else {
-    if (booksSkeleton) booksSkeleton.outerHTML = `
-      <div class="status-msg status-msg-inline">
-        <p>Could not load popular books. Search above to find any book.</p>
-      </div>`;
-  }
+    area.innerHTML = `
+      <div class="featured-header">
+        <span class="featured-label">🔥 Popular Books</span>
+        <span class="featured-hint">Search above to find any book</span>
+      </div>
+      <div class="books-grid">${cards}</div>`;
 
-  // ── Render Popular Audiobooks ──
-  const abSkeleton = document.getElementById('ab-skeleton');
-  if (audioResult.status === 'fulfilled' && audioResult.value.audiobooks && audioResult.value.audiobooks.length > 0) {
-    const cards = audioResult.value.audiobooks.map(ab => buildAudiobookCard(ab)).join('');
-    if (abSkeleton) abSkeleton.outerHTML = `<div class="books-grid">${cards}</div>`;
-  } else {
-    if (abSkeleton) abSkeleton.outerHTML = '';
+    area.querySelectorAll('.heart-btn').forEach(btn => {
+      btn.addEventListener('click', () => handleHeart(btn));
+    });
+  } catch (err) {
+    area.innerHTML = `
+      <div class="status-msg">
+        <span class="status-icon">📚</span>
+        <p>Search for a book to get started.</p>
+        <p class="status-hint">Try "Harry Potter", "Atomic Habits", or any author name.</p>
+      </div>`;
   }
 }
 
@@ -162,15 +190,8 @@ async function doSearch(query, startIndex = 0) {
   showLoading();
 
   try {
-    // Fetch books (Open Library) and audiobooks (LibriVox) in parallel
-    const booksPage = Math.floor(startIndex / PAGE_SIZE) + 1;
-    const [booksRes, abRes] = await Promise.all([
-      fetch(`/api/search/?${new URLSearchParams({ q: query, max_results: PAGE_SIZE, start_index: startIndex })}`),
-      fetch(`/api/search-audiobooks/?${new URLSearchParams({ q: query, page: booksPage })}`),
-    ]);
-
+    const booksRes = await fetch(`/api/search/?${new URLSearchParams({ q: query, max_results: PAGE_SIZE, start_index: startIndex })}`);
     const booksData = await booksRes.json();
-    const abData = await abRes.json();
 
     if (!booksRes.ok) {
       showError(booksData.error || 'Something went wrong.');
@@ -178,7 +199,7 @@ async function doSearch(query, startIndex = 0) {
     }
 
     currentTotalItems = booksData.total_items || 0;
-    renderResults(booksData, abData, query, startIndex);
+    renderResults(booksData, query, startIndex);
   } catch (err) {
     showError('Network error. Please try again.');
   }
@@ -206,12 +227,11 @@ function showError(msg) {
     </div>`;
 }
 
-function renderResults(booksData, abData, query, startIndex) {
+function renderResults(booksData, query, startIndex) {
   const area = document.getElementById('results-area');
   const { books, total_items } = booksData;
-  const audiobooks = abData ? (abData.audiobooks || []) : [];
 
-  if ((!books || books.length === 0) && audiobooks.length === 0) {
+  if (!books || books.length === 0) {
     area.innerHTML = `
       <div class="status-msg">
         <span class="status-icon">📭</span>
@@ -262,87 +282,14 @@ function renderResults(booksData, abData, query, startIndex) {
       </div>`;
   }
 
-  // ── Audiobooks section ──
-  let abSection = '';
-  if (audiobooks.length > 0) {
-    const abCards = audiobooks.map(ab => buildAudiobookCard(ab)).join('');
-    abSection = `
-      <div class="results-section-divider"></div>
-      <div class="results-info">
-        <div class="results-count"><strong>🎧 Audiobooks</strong> — Free public domain audiobooks from LibriVox</div>
-      </div>
-      <div class="books-grid">${abCards}</div>`;
-  } else {
-    abSection = `
-      <div class="results-section-divider"></div>
-      <div class="results-info">
-        <div class="results-count"><strong>🎧 Audiobooks</strong></div>
-      </div>
-      <div class="status-msg status-msg-inline">
-        <span class="status-icon">🎙️</span>
-        <p>No audiobooks found for "<strong>${escHtml(query)}</strong>".</p>
-        <p class="status-hint">LibriVox offers free public domain recordings.</p>
-      </div>`;
-  }
+  area.innerHTML = booksSection;
 
-  area.innerHTML = booksSection + abSection;
+  area.querySelectorAll('.heart-btn').forEach(btn => {
+    btn.addEventListener('click', () => handleHeart(btn));
+  });
 
   // Scroll to top of results
   area.scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-// Helper to attach audiobook listen/player listeners on a container
-function attachAudiobookListeners(container) {
-  // The global delegation in initAudioPlayer handles [data-ab-key] clicks already.
-  // This is a no-op kept for future per-container use.
-}
-
-// Store audiobook data for inline player
-const audiobookStore = {};
-let abStoreCounter = 0;
-
-function storeAudiobook(ab) {
-  const key = `ab_${++abStoreCounter}`;
-  audiobookStore[key] = ab;
-  return key;
-}
-
-function buildAudiobookCard(ab, isFav = false) {
-  const storeKey = storeAudiobook(ab);
-  const title = escHtml(ab.title || 'Unknown Title');
-  const author = escHtml(ab.authors || 'Unknown Author');
-  const lang = ab.language ? `<span class="book-year">${escHtml(ab.language)}</span>` : '';
-  const duration = ab.totaltime ? `<span class="book-rating">⏱ ${escHtml(ab.totaltime)}</span>` : '';
-  const year = ab.published ? `<span class="book-year">${escHtml(String(ab.published))}</span>` : '';
-
-  return `
-    <div class="book-card audiobook-card" role="article">
-      <button class="book-card-link audiobook-card-btn" aria-label="Listen to ${title}" data-ab-key="${escAttr(storeKey)}">
-        <div class="book-cover audiobook-cover-placeholder">
-          <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <span>Audiobook</span>
-        </div>
-        <div class="book-info">
-          <div class="book-title">${title}</div>
-          <div class="book-author">${author}</div>
-          <div class="book-meta">
-            ${year}${lang}${duration}
-          </div>
-        </div>
-      </button>
-      <div class="audiobook-card-actions">
-        <button class="audiobook-listen-btn" aria-label="Listen to ${title}" data-ab-key="${escAttr(storeKey)}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-          Listen
-        </button>
-        <button class="heart-btn ab-heart-btn ${isFav ? 'active' : ''}"
-          aria-label="Save audiobook to favorites"
-          data-ab-id="${escAttr(storeKey)}"
-          data-active="${isFav ? '1' : '0'}">
-          ${heartSvg()}
-        </button>
-      </div>
-    </div>`;
 }
 
 function goToPage(startIndex) {
@@ -443,41 +390,6 @@ function updateFavBadge(delta) {
   badge.style.display = next === 0 ? 'none' : '';
 }
 
-// ─── Audiobook Heart / Favorite ──────────────────────────────
-
-async function handleAudiobookHeart(btn) {
-  const isActive = btn.dataset.active === '1';
-  const ab = audiobookStore[btn.dataset.abId];
-  if (!ab) return;
-
-  btn.classList.add('pulse');
-  btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
-
-  if (isActive) {
-    try {
-      const res = await fetch(`/api/favorite-audiobooks/${encodeURIComponent(String(ab.id))}/remove/`, { method: 'DELETE' });
-      if (res.ok) {
-        btn.dataset.active = '0';
-        btn.classList.remove('active');
-        showToast('Removed from favorites.', 'success');
-      }
-    } catch { showToast('Network error.', 'error'); }
-  } else {
-    try {
-      const res = await fetch('/api/favorite-audiobooks/add/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(ab),
-      });
-      if (res.ok || res.status === 201) {
-        btn.dataset.active = '1';
-        btn.classList.add('active');
-        showToast('Saved to favorites! ❤️', 'success');
-      }
-    } catch { showToast('Network error.', 'error'); }
-  }
-}
-
 // ─── Favorites Page ───────────────────────────────────────────
 
 function initFavoritesPage() {
@@ -486,24 +398,6 @@ function initFavoritesPage() {
 
   document.querySelectorAll('.remove-btn').forEach(btn => {
     btn.addEventListener('click', () => removeFromFavorites(btn));
-  });
-
-  // Tab switching
-  const tabs = document.querySelectorAll('.fav-tab');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      tabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      const panelId = `tab-${tab.dataset.tab}`;
-      document.querySelectorAll('.fav-tab-panel').forEach(p => p.hidden = true);
-      const panel = document.getElementById(panelId);
-      if (panel) panel.hidden = false;
-
-      // Lazy-load audiobooks tab on first open
-      if (tab.dataset.tab === 'audiobooks') {
-        loadFavoriteAudiobooks();
-      }
-    });
   });
 }
 
@@ -550,106 +444,6 @@ function checkFavEmpty() {
         <p>Your favorites list is empty.</p>
         <p class="status-hint"><a href="/" style="color:var(--accent)">Search for books</a> and tap the heart to save them here.</p>
       </div>`;
-  }
-}
-
-// ─── Favorite Audiobooks (favorites page) ────────────────────
-
-let _favAudiobooksLoaded = false;
-
-async function loadFavoriteAudiobooks() {
-  if (_favAudiobooksLoaded) return;
-  _favAudiobooksLoaded = true;
-
-  const area = document.getElementById('fav-audio-area');
-  if (!area) return;
-
-  area.innerHTML = `<div class="status-msg"><div class="reader-spinner"></div><p>Loading your audiobooks…</p></div>`;
-
-  try {
-    const res = await fetch('/api/favorite-audiobooks/');
-    const data = await res.json();
-    const audiobooks = data.audiobooks || [];
-
-    if (audiobooks.length === 0) {
-      area.innerHTML = `
-        <div class="status-msg">
-          <span class="status-icon">🎧</span>
-          <p>No favorite audiobooks yet.</p>
-          <p class="status-hint"><a href="/" style="color:var(--accent)">Search for audiobooks</a> and tap the heart to save them here.</p>
-        </div>`;
-      return;
-    }
-
-    const cards = audiobooks.map(ab => buildFavAudiobookCard(ab)).join('');
-    area.innerHTML = `<div class="fav-grid" id="fav-audio-grid">${cards}</div>`;
-
-    area.querySelectorAll('.remove-ab-btn').forEach(btn => {
-      btn.addEventListener('click', () => removeFromFavoriteAudiobooks(btn));
-    });
-    // Audio player is handled by global delegation in initAudioPlayer
-  } catch {
-    area.innerHTML = `<div class="status-msg"><p>Failed to load audiobooks.</p></div>`;
-  }
-}
-
-function buildFavAudiobookCard(ab) {
-  const storeKey = storeAudiobook(ab);
-  const title = escHtml(ab.title || 'Unknown Title');
-  const author = escHtml(ab.authors || 'Unknown Author');
-  const lang = ab.language ? `<span class="book-year">${escHtml(ab.language)}</span>` : '';
-  const duration = ab.totaltime ? `<span class="book-rating">⏱ ${escHtml(ab.totaltime)}</span>` : '';
-  const year = ab.published ? `<span class="book-year">${escHtml(String(ab.published))}</span>` : '';
-
-  return `
-    <div class="fav-card" data-ab-id="${escAttr(String(ab.librivox_id))}">
-      <button class="remove-btn remove-ab-btn" data-id="${escAttr(String(ab.librivox_id))}" aria-label="Remove from favorites" title="Remove">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-            fill="#e05252" stroke="#e05252"/>
-        </svg>
-      </button>
-      <button class="book-card-link audiobook-card-btn" data-ab-key="${escAttr(storeKey)}" aria-label="Listen to ${title}">
-        <div class="book-cover audiobook-cover-placeholder">
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          <span>Audiobook</span>
-        </div>
-        <div class="book-info">
-          <div class="book-title">${title}</div>
-          <div class="book-author">${author}</div>
-          <div class="book-meta">${year}${lang}${duration}</div>
-        </div>
-      </button>
-    </div>`;
-}
-
-async function removeFromFavoriteAudiobooks(btn) {
-  const id = btn.dataset.id;
-  const card = document.querySelector(`.fav-card[data-ab-id="${CSS.escape(id)}"]`);
-  try {
-    const res = await fetch(`/api/favorite-audiobooks/${encodeURIComponent(id)}/remove/`, { method: 'DELETE' });
-    if (res.ok) {
-      card.style.transition = 'opacity 0.3s, transform 0.3s';
-      card.style.opacity = '0';
-      card.style.transform = 'scale(0.95)';
-      setTimeout(() => {
-        card.remove();
-        const grid = document.getElementById('fav-audio-grid');
-        if (grid && grid.children.length === 0) {
-          document.getElementById('fav-audio-area').innerHTML = `
-            <div class="status-msg">
-              <span class="status-icon">🎧</span>
-              <p>No favorite audiobooks yet.</p>
-              <p class="status-hint"><a href="/" style="color:var(--accent)">Search for audiobooks</a> and tap the heart to save them here.</p>
-            </div>`;
-        }
-      }, 300);
-      showToast('Removed from favorites.', 'success');
-    } else {
-      showToast('Failed to remove.', 'error');
-    }
-  } catch {
-    showToast('Network error.', 'error');
   }
 }
 
@@ -912,202 +706,11 @@ function closeReader() {
   if (viewerEl) viewerEl.innerHTML = '';
 }
 
-// ─── Inline Audio Player ──────────────────────────────────────
-
-let currentAudio = null;
-let currentChapterIndex = 0;
-let playerChapters = [];
-
-function initAudioPlayer() {
-  const modal = document.getElementById('audio-player-modal');
-  if (!modal) return;
-
-  document.getElementById('audio-close-btn').addEventListener('click', closeAudioPlayer);
-  modal.addEventListener('click', e => { if (e.target === modal) closeAudioPlayer(); });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !modal.hidden) closeAudioPlayer(); });
-
-  // Global delegation: audiobook listen buttons open player; hearts toggle favorites
-  document.addEventListener('click', e => {
-    // Audiobook heart button
-    const heartBtn = e.target.closest('.ab-heart-btn');
-    if (heartBtn) {
-      e.stopPropagation();
-      handleAudiobookHeart(heartBtn);
-      return;
-    }
-    // Book heart button (non-audiobook)
-    const bookHeart = e.target.closest('.heart-btn:not(.ab-heart-btn)');
-    if (bookHeart && bookHeart.dataset.storeKey) {
-      e.stopPropagation();
-      handleHeart(bookHeart);
-      return;
-    }
-    // Audiobook card / listen button → open player
-    const btn = e.target.closest('[data-ab-key]');
-    if (!btn) return;
-    const key = btn.getAttribute('data-ab-key');
-    const ab = audiobookStore[key];
-    if (ab) openAudioPlayer(ab);
-  });
-}
-
-function openAudioPlayer(ab) {
-  const modal = document.getElementById('audio-player-modal');
-  const titleEl = document.getElementById('audio-player-title');
-  const authorEl = document.getElementById('audio-player-author');
-  const chapterList = document.getElementById('audio-chapter-list');
-  const audioEl = document.getElementById('audio-player-element');
-  const statusEl = document.getElementById('audio-player-status');
-  const nowPlayingEl = document.getElementById('audio-now-playing');
-  const librivoxLink = document.getElementById('audio-librivox-link');
-
-  // Reset
-  playerChapters = [];
-  currentChapterIndex = 0;
-  if (currentAudio) { currentAudio.pause(); }
-  audioEl.src = '';
-  chapterList.innerHTML = '';
-  nowPlayingEl.textContent = '';
-  statusEl.hidden = false;
-  statusEl.innerHTML = `<div class="reader-spinner"></div><span>Loading chapters…</span>`;
-
-  titleEl.textContent = ab.title || 'Unknown Title';
-  authorEl.textContent = ab.authors || 'Unknown Author';
-  if (ab.url_librivox) {
-    librivoxLink.href = ab.url_librivox;
-    librivoxLink.hidden = false;
-  } else {
-    librivoxLink.hidden = true;
-  }
-
-  modal.hidden = false;
-  document.body.style.overflow = 'hidden';
-
-  if (!ab.url_rss) {
-    statusEl.innerHTML = `<span>No chapter list available for this audiobook.</span>`;
-    return;
-  }
-
-  fetch(`/api/audiobook-rss/?url=${encodeURIComponent(ab.url_rss)}`)
-    .then(r => r.json())
-    .then(data => {
-      statusEl.hidden = true;
-      if (!data.chapters || data.chapters.length === 0) {
-        statusEl.hidden = false;
-        statusEl.innerHTML = `<span>No playable chapters found.</span>`;
-        return;
-      }
-      playerChapters = data.chapters;
-      renderChapterList(chapterList, audioEl, nowPlayingEl);
-      playChapter(0, audioEl, chapterList, nowPlayingEl);
-    })
-    .catch(() => {
-      statusEl.innerHTML = `<span>Could not load chapters. Try listening on LibriVox.</span>`;
-    });
-}
-
-function renderChapterList(listEl, audioEl, nowPlayingEl) {
-  listEl.innerHTML = '';
-  playerChapters.forEach((ch, i) => {
-    const btn = document.createElement('button');
-    btn.className = 'audio-chapter-item';
-    btn.setAttribute('data-index', i);
-    btn.innerHTML = `
-      <span class="audio-chapter-num">${i + 1}</span>
-      <span class="audio-chapter-title">${escHtml(ch.title)}</span>
-      ${ch.duration ? `<span class="audio-chapter-dur">${escHtml(ch.duration)}</span>` : ''}`;
-    btn.addEventListener('click', () => playChapter(i, audioEl, listEl, nowPlayingEl));
-    listEl.appendChild(btn);
-  });
-}
-
-function playChapter(index, audioEl, listEl, nowPlayingEl) {
-  if (index < 0 || index >= playerChapters.length) return;
-  currentChapterIndex = index;
-  const ch = playerChapters[index];
-
-  // Update active state
-  listEl.querySelectorAll('.audio-chapter-item').forEach((btn, i) => {
-    btn.classList.toggle('active', i === index);
-  });
-  // Scroll active chapter into view
-  const activeBtn = listEl.querySelector('.audio-chapter-item.active');
-  if (activeBtn) activeBtn.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-
-  nowPlayingEl.textContent = ch.title;
-  audioEl.src = ch.url;
-  audioEl.play().catch(() => {});
-
-  // Auto-advance to next chapter
-  audioEl.onended = () => {
-    if (currentChapterIndex + 1 < playerChapters.length) {
-      playChapter(currentChapterIndex + 1, audioEl, listEl, nowPlayingEl);
-    }
-  };
-}
-
-function closeAudioPlayer() {
-  const modal = document.getElementById('audio-player-modal');
-  if (!modal) return;
-  modal.hidden = true;
-  document.body.style.overflow = '';
-  const audioEl = document.getElementById('audio-player-element');
-  if (audioEl) { audioEl.pause(); audioEl.src = ''; }
-  playerChapters = [];
-}
-
-// ─── Mobile Sidebar Toggle ────────────────────────────────────
-
-function initMobileNav() {
-  const hamburger = document.getElementById('hamburger-btn');
-  const sidebar   = document.querySelector('.sidebar');
-  const overlay   = document.getElementById('sidebar-overlay');
-  if (!hamburger || !sidebar || !overlay) return;
-
-  function openSidebar() {
-    sidebar.classList.add('sidebar-open');
-    overlay.classList.add('active');
-    document.body.classList.add('sidebar-is-open');
-    hamburger.setAttribute('aria-expanded', 'true');
-  }
-
-  function closeSidebar() {
-    sidebar.classList.remove('sidebar-open');
-    overlay.classList.remove('active');
-    document.body.classList.remove('sidebar-is-open');
-    hamburger.setAttribute('aria-expanded', 'false');
-  }
-
-  hamburger.addEventListener('click', () => {
-    if (sidebar.classList.contains('sidebar-open')) {
-      closeSidebar();
-    } else {
-      openSidebar();
-    }
-  });
-
-  overlay.addEventListener('click', closeSidebar);
-
-  // Close sidebar when a nav link is tapped on mobile
-  sidebar.querySelectorAll('.nav-item').forEach(link => {
-    link.addEventListener('click', () => {
-      if (window.innerWidth <= 768) closeSidebar();
-    });
-  });
-
-  // Close on Escape key
-  document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeSidebar();
-  });
-}
-
 document.addEventListener('DOMContentLoaded', () => {
-  initMobileNav();
   initSearchPage();
   initFavoritesPage();
   initDetailPage();
   initReaderModal();
-  initAudioPlayer();
 });
 
 // Re-load state when user navigates back (bfcache restore)

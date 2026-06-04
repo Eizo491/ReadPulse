@@ -14,117 +14,63 @@
 </div>
 
 <div class="page-content">
+  <div id="fav-area">
+    {% if favorites %}
+    <div class="fav-grid" id="fav-grid">
+      {% for book in favorites %}
+      <div class="fav-card" data-id="{{ book.google_books_id }}">
 
-  <!-- Tabs -->
-  <div class="fav-tabs" id="fav-tabs">
-    <button class="fav-tab active" data-tab="books">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-      Books
-    </button>
-    <button class="fav-tab" data-tab="audiobooks">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 18v-6a9 9 0 0 1 18 0v6"/><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3z"/><path d="M3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"/></svg>
-      Audiobooks
-    </button>
-  </div>
-
-  <!-- Books tab -->
-  <div id="tab-books" class="fav-tab-panel active">
-    <div id="fav-area">
-      {% if favorites %}
-      <div class="fav-grid" id="fav-grid">
-        {% for book in favorites %}
-        <div class="fav-card" data-id="{{ book.google_books_id }}">
-          <button class="remove-btn" data-id="{{ book.google_books_id }}" aria-label="Remove from favorites" title="Remove">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
-                fill="#e05252" stroke="#e05252"/>
-            </svg>
-          </button>
-          <a href="/books/{{ book.google_books_id }}/" class="book-card-link" aria-label="View details for {{ book.title }}">
-            <div class="book-cover">
-              {% if book.thumbnail %}
-              <img src="{{ book.thumbnail }}" alt="{{ book.title }}" loading="lazy"
-                   onerror="this.parentElement.innerHTML='<div class=\'book-cover-placeholder\'><svg width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><path d=\'M4 19.5A2.5 2.5 0 0 1 6.5 17H20\'/><path d=\'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\'/></svg><span>No Cover</span></div>'">
-              {% else %}
-              <div class="book-cover-placeholder">
-                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                  <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
-                  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
-                </svg>
-                <span>No Cover</span>
-              </div>
-              {% endif %}
-            </div>
-            <div class="book-info">
-              <div class="book-title">{{ book.title }}</div>
-              {% if book.authors %}<div class="book-author">{{ book.authors }}</div>{% endif %}
-              <div class="book-meta">
-                {% if book.published_date %}<span class="book-year">{{ book.published_date|slice:":4" }}</span>{% endif %}
-                {% if book.average_rating %}<span class="book-rating">★ {{ book.average_rating }}</span>{% endif %}
-              </div>
-            </div>
-          </a>
-        </div>
-        {% endfor %}
-      </div>
-      {% else %}
-      <div class="status-msg">
-        <span class="status-icon">🤍</span>
-        <p>Your favorites list is empty.</p>
-        <p class="status-hint"><a href="/" style="color:var(--accent)">Search for books</a> and tap the heart to save them here.</p>
-      </div>
-      {% endif %}
-    </div>
-  </div>
-
-  <!-- Audiobooks tab -->
-  <div id="tab-audiobooks" class="fav-tab-panel" hidden>
-    <div id="fav-audio-area">
-      <div class="status-msg">
-        <div class="reader-spinner"></div>
-        <p>Loading your audiobooks…</p>
-      </div>
-    </div>
-  </div>
-
-</div>
-
-<!-- Audio Player Modal (reused from search page) -->
-<div id="audio-player-modal" class="reader-modal" role="dialog" aria-modal="true" aria-label="Audiobook Player" hidden>
-  <div class="reader-modal-inner audio-player-inner">
-    <div class="reader-modal-header">
-      <div>
-        <div class="reader-modal-title" id="audio-player-title"></div>
-        <div class="audio-player-author" id="audio-player-author"></div>
-      </div>
-      <div style="display:flex;align-items:center;gap:8px;flex-shrink:0;">
-        <a id="audio-librivox-link" href="#" target="_blank" rel="noopener" class="audio-librivox-link" title="Open on LibriVox" hidden>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-          LibriVox
-        </a>
-        <button class="reader-close-btn" id="audio-close-btn" aria-label="Close player">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-            <path d="M18 6 6 18M6 6l12 12"/>
+        <!-- Remove button (outside link so it doesn't navigate) -->
+        <button class="remove-btn" data-id="{{ book.google_books_id }}" aria-label="Remove from favorites" title="Remove">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"
+              fill="#e05252" stroke="#e05252"/>
           </svg>
         </button>
+
+        <a href="/books/{{ book.google_books_id }}/" class="book-card-link" aria-label="View details for {{ book.title }}">
+          <div class="book-cover">
+            {% if book.thumbnail %}
+            <img src="{{ book.thumbnail }}" alt="{{ book.title }}" loading="lazy"
+                 onerror="this.parentElement.innerHTML='<div class=\'book-cover-placeholder\'><svg width=\'32\' height=\'32\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'1.5\'><path d=\'M4 19.5A2.5 2.5 0 0 1 6.5 17H20\'/><path d=\'M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z\'/></svg><span>No Cover</span></div>'">
+            {% else %}
+            <div class="book-cover-placeholder">
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+              <span>No Cover</span>
+            </div>
+            {% endif %}
+          </div>
+
+          <div class="book-info">
+            <div class="book-title">{{ book.title }}</div>
+            {% if book.authors %}
+            <div class="book-author">{{ book.authors }}</div>
+            {% endif %}
+            <div class="book-meta">
+              {% if book.published_date %}
+              <span class="book-year">{{ book.published_date|slice:":4" }}</span>
+              {% endif %}
+              {% if book.average_rating %}
+              <span class="book-rating">★ {{ book.average_rating }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </a>
+
       </div>
+      {% endfor %}
     </div>
-    <div class="audio-player-body">
-      <div class="audio-controls-wrap">
-        <div class="audio-now-playing-wrap">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
-          <span id="audio-now-playing" class="audio-now-playing-text"></span>
-        </div>
-        <audio id="audio-player-element" controls class="audio-element" preload="none"></audio>
-      </div>
-      <div class="audio-chapter-wrap">
-        <div class="audio-chapter-heading">Chapters</div>
-        <div id="audio-player-status" class="audio-player-status">
-          <div class="reader-spinner"></div><span>Loading chapters…</span>
-        </div>
-        <div id="audio-chapter-list" class="audio-chapter-list"></div>
-      </div>
+
+    {% else %}
+    <div class="status-msg">
+      <span class="status-icon">🤍</span>
+      <p>Your favorites list is empty.</p>
+      <p class="status-hint"><a href="/" style="color:var(--accent)">Search for books</a> and tap the heart to save them here.</p>
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
